@@ -1,4 +1,4 @@
-//! Ajustes generales y tr("Acerca de", "About").
+//! Ajustes generales y "Acerca de".
 
 use eframe::egui::{self, TextureHandle};
 use yescharge_core::config::Config;

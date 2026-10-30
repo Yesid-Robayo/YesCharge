@@ -1,4 +1,4 @@
-//! Asistente tr("Añadir dispositivo", "Add device"): elegir → probar (Windows, HID estándar) → si hace falta,
+//! Asistente "Añadir dispositivo": elegir → probar (Windows, HID estándar) → si hace falta,
 //! crear el perfil propio escuchando → confirmar con el usuario → guardar.
 //!
 //! Nada de esto envía datos al dispositivo, salvo que el usuario acepte el aviso de riesgo para
