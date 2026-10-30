@@ -1,0 +1,49 @@
+name: Error / Bug
+description: Algo no funciona como debería / Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por avisar. Si es un problema de seguridad, **no** lo pongas aquí: mira SECURITY.md.
+        Thanks for reporting. Security problems go through SECURITY.md, not here.
+  - type: input
+    id: version
+    attributes:
+      label: Versión de YesCharge / YesCharge version
+      description: Sale en Ajustes › Acerca de. / Shown in Settings › About.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Versión de Windows / Windows version
+      placeholder: "Windows 11 24H2"
+  - type: input
+    id: device
+    attributes:
+      label: Dispositivo afectado / Affected device
+      description: Nombre y cómo se conecta (dongle 2.4 GHz, Bluetooth, cable). / Name and how it connects.
+  - type: textarea
+    id: what
+    attributes:
+      label: Qué pasó / What happened
+      description: Qué esperabas y qué pasó. / What you expected and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Cómo repetirlo / How to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: logs
+    attributes:
+      label: yescharge.log y capturas / yescharge.log and screenshots
+      description: |
+        Arrastra aquí tu %APPDATA%\YesCharge\yescharge.log (Ajustes › Abrir el log) y capturas si puedes.
+        Drag your %APPDATA%\YesCharge\yescharge.log (Settings › Open the log) and screenshots here if you can.

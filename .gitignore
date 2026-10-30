@@ -1,0 +1,33 @@
+# Compilación
+/target/
+**/*.rs.bk
+*.pdb
+
+# Datos de ejecución (viven en %APPDATA%\YesCharge, pero por si se usa YESCHARGE_DATA_DIR dentro del repo)
+*.log
+config.json
+status.json
+history.json
+model.json
+state.json
+captures/
+
+# Nunca subir claves, certificados ni secretos
+*.pem
+*.key
+*.cer
+*.crt
+*.pfx
+*.p12
+.env
+
+# Editores y sistema
+.vs/
+.idea/
+.vscode/
+*.user
+Thumbs.db
+Desktop.ini
+
+# Worktrees y datos locales de los agentes
+.claude/

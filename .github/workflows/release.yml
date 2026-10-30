@@ -1,0 +1,47 @@
+# Al empujar una etiqueta vX.Y.Z: compila el exe en GitHub, publica su SHA256 y una atestación de origen (prueba
+# verificable de que el exe salió de este código y de este workflow). La release queda como borrador para revisarla.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Rust estable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Pruebas
+        run: cargo test --locked
+      - name: Compilar
+        run: cargo build --release --locked -p yescharge
+      - name: Preparar archivos
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target\release\YesCharge.exe dist\
+          $h = (Get-FileHash dist\YesCharge.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  YesCharge.exe" | Out-File dist\SHA256SUMS.txt -Encoding ascii
+      - name: Atestación de origen
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/YesCharge.exe
+      - name: Crear la release (borrador)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create $env:TAG dist\YesCharge.exe dist\SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --draft --title "YesCharge $env:TAG" --notes "Notas en CHANGELOG.md / CHANGELOG.es.md."

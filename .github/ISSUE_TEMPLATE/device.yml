@@ -1,0 +1,66 @@
+name: Dispositivo nuevo / New device
+description: YesCharge no puede leer la batería de mi dispositivo / YesCharge can't read my device's battery
+labels: [device]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias: así crece el soporte de dispositivos. YesCharge solo les pregunta a los modelos de su lista comprobada;
+        los demás solo se pueden leer si dicen su batería por su cuenta o si Windows ya la conoce.
+        Thanks: this is how device support grows. YesCharge only asks models on its verified list; any other device can
+        only be read if it reports its battery on its own or if Windows already knows it.
+  - type: input
+    id: model
+    attributes:
+      label: Marca y modelo / Brand and model
+      placeholder: "Marca Modelo X / Brand Model X"
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Conexión / Connection
+      options:
+        - Dongle 2.4 GHz
+        - Bluetooth
+        - Cable USB / USB cable
+        - Varias / Several
+    validations:
+      required: true
+  - type: input
+    id: vidpid
+    attributes:
+      label: VID:PID
+      description: Sale debajo del nombre en el asistente (p. ej. 1234:5678). / Shown under the name in the wizard.
+  - type: dropdown
+    id: official
+    attributes:
+      label: ¿Su app oficial muestra la batería? / Does its official app show the battery?
+      options:
+        - Sí / Yes
+        - No
+        - No lo sé / I don't know
+  - type: input
+    id: percent
+    attributes:
+      label: Porcentaje que muestra su app oficial / Percentage its official app shows
+      placeholder: "50"
+  - type: input
+    id: webdriver
+    attributes:
+      label: ¿Se configura desde una página web? / Is it configured from a web page?
+      description: Pega el enlace si tu marca tiene un configurador web. / Paste the link if your brand has a web configurator.
+      placeholder: "https://..."
+  - type: textarea
+    id: capture
+    attributes:
+      label: Informe de la prueba / Test report
+      description: |
+        Si el asistente te lo ofreció, arrastra aquí el .json de %APPDATA%\YesCharge\captures (revísalo antes: solo
+        tiene el nombre del dispositivo y los bytes que envió).
+        If the wizard offered it, drag the .json from %APPDATA%\YesCharge\captures here (check it first: it only has
+        the device name and the bytes it sent).
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notas / Notes
