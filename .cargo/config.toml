@@ -1,0 +1,5 @@
+# crt-static: el exe no necesita VCRUNTIME140.dll, así funciona sin instalar nada.
+# DEPENDENTLOADFLAG (0x800, LOAD_LIBRARY_SEARCH_SYSTEM32): las DLL que importa el exe solo se cargan de
+# System32. Sin esto, una DLL plantada junto al exe, por ejemplo en Descargas, se cargaría primero.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=/DEPENDENTLOADFLAG:0x800"]

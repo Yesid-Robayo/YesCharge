@@ -32,7 +32,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item target\release\YesCharge.exe dist\
+          Copy-Item target\release\YesCharge.exe, LICENSE, THIRD_PARTY_NOTICES.txt dist\
           $h = (Get-FileHash dist\YesCharge.exe -Algorithm SHA256).Hash.ToLower()
           [IO.File]::WriteAllText("$PWD\dist\SHA256SUMS.txt", "$h  YesCharge.exe`n")
       - name: Atestación de origen
@@ -52,4 +52,4 @@ jobs:
             $Matches[1].Trim()
           }
           "## English`n`n$(Notes CHANGELOG.md)`n`n## Español`n`n$(Notes CHANGELOG.es.md)" | Out-File dist\notes.md -Encoding utf8
-          gh release create $env:TAG dist\YesCharge.exe dist\SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --draft --title "YesCharge $env:TAG" --notes-file dist\notes.md
+          gh release create $env:TAG dist\YesCharge.exe dist\SHA256SUMS.txt dist\LICENSE dist\THIRD_PARTY_NOTICES.txt --repo $env:GITHUB_REPOSITORY --draft --title "YesCharge $env:TAG" --notes-file dist\notes.md

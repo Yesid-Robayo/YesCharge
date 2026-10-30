@@ -5,7 +5,7 @@
 **See the battery of your wireless mice, keyboards, headsets and controllers in the Windows tray, without touching
 your devices.**
 
-![Version](https://img.shields.io/badge/version-0.1.0-43e5a0)
+![Version](https://img.shields.io/badge/version-0.1.1-43e5a0)
 ![Status](https://img.shields.io/badge/status-beta-f0c86a)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-2f5fb3)
 ![Size](https://img.shields.io/badge/size-~5%20MB%2C%20no%20runtime-12a8c9)

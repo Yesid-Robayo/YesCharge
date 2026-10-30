@@ -5,7 +5,7 @@
 **Mira la batería de tus ratones, teclados, auriculares y mandos inalámbricos en la bandeja de Windows, sin tocar tus
 dispositivos.**
 
-![Versión](https://img.shields.io/badge/versión-0.1.0-43e5a0)
+![Versión](https://img.shields.io/badge/versión-0.1.1-43e5a0)
 ![Estado](https://img.shields.io/badge/estado-beta-f0c86a)
 ![Plataforma](https://img.shields.io/badge/plataforma-Windows%2010%20%7C%2011-2f5fb3)
 ![Tamaño](https://img.shields.io/badge/tamaño-~5%20MB%2C%20sin%20runtime-12a8c9)

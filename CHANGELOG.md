@@ -8,6 +8,16 @@ and Spanish and their SHA256 on the [Releases](https://github.com/Yesid-Robayo/Y
 When a new version is published, it is added at the top with the same content as the *What's new* section of its
 release notes.
 
+## 0.1.1
+
+A maintenance version: how the app works doesn't change.
+
+- **It really needs nothing installed.** The exe depended on `VCRUNTIME140.dll`, from the Microsoft Visual C++ Redistributable,
+  even though it promised no runtime. On a PC without that package it wouldn't open. It now carries that code inside.
+- **Safer DLL loading.** It only loads DLLs from the Windows system folder, so a file placed next to the exe, for example in
+  Downloads, can't be loaded instead.
+- **Each release includes its license and third-party notices**, and the list of bundled fonts is corrected.
+
 ## 0.1.0
 
 First version. It's a personal project in beta: **you use it at your own risk**, and it may not work with your device.

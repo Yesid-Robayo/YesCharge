@@ -7,6 +7,16 @@ exe, sus notas en inglés y en español y su SHA256 en [Releases](https://github
 
 Al publicar una versión nueva, se añade aquí arriba con lo mismo que su sección *Novedades* de las notas de la release.
 
+## 0.1.1
+
+Versión de mantenimiento: no cambia cómo funciona la app.
+
+- **De verdad no hay que instalar nada.** El exe dependía de `VCRUNTIME140.dll`, del paquete Visual C++ Redistributable de
+  Microsoft, aunque prometía no necesitar runtime. En un PC sin ese paquete no abría. Ahora lleva ese código dentro.
+- **Carga de DLL más segura.** Solo carga DLL de la carpeta del sistema de Windows, así que un archivo puesto junto al exe, por
+  ejemplo en Descargas, no puede cargarse en su lugar.
+- **Cada versión incluye su licencia y los avisos de terceros**, y se corrige la lista de fuentes incluidas.
+
 ## 0.1.0
 
 Primera versión. Es un proyecto personal en beta: **se usa bajo tu propio riesgo** y puede que no funcione con tu

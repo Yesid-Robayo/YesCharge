@@ -35,6 +35,8 @@ Only the latest version published in *Releases* receives fixes.
   `0xFF00`–`0xFFFF`), never the keyboard or mouse ones, which Windows keeps for itself anyway.
 - **Without asking, the only requests that reach the device** are the standard HID `GET_REPORT` of the *Battery Strength*
   value, and only if the device declares it. It's the same read Windows does for Bluetooth devices.
+- **DLLs only from the system folder.** The exe loads its DLLs from Windows' System32, so one placed next to it can't take
+  their place.
 - **No administrator rights, no drivers, no services installed.** Starting with Windows is a value in
   `HKCU\...\Run` that you can turn off.
 - **No telemetry, no automatic updates, no accounts.** It never connects to the internet. The links in the window
@@ -91,6 +93,8 @@ Solo la última versión publicada en *Releases* recibe arreglos.
   nunca las de teclado o ratón, que además Windows reserva para sí.
 - **Sin preguntar, las únicas peticiones que llegan al dispositivo** son el `GET_REPORT` HID estándar del valor *Battery
   Strength*, y solo si el dispositivo lo declara. Es la misma lectura que hace Windows con los dispositivos Bluetooth.
+- **DLL solo de la carpeta del sistema.** El exe carga sus DLL de System32 de Windows, así que una puesta a su lado no puede
+  ocupar su lugar.
 - **Sin permisos de administrador, sin drivers, sin servicios instalados.** Iniciar con Windows es un valor en
   `HKCU\...\Run` que puedes desactivar.
 - **Sin telemetría, sin actualizaciones automáticas, sin cuentas.** Nunca se conecta a internet. Los enlaces de la
