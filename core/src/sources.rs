@@ -18,7 +18,8 @@ use windows_sys::Win32::Devices::HumanInterfaceDevice::{
     HidD_GetPreparsedData, HidP_Feature, HidP_GetUsageValue, HidP_GetValueCaps, HidP_Input,
 };
 use windows_sys::Win32::Devices::Properties::{
-    DEVPKEY_Device_DeviceDesc, DEVPKEY_Device_FriendlyName, DEVPROP_TYPE_BYTE, DEVPROP_TYPE_STRING, DEVPROPTYPE,
+    DEVPKEY_Device_DeviceDesc, DEVPKEY_Device_FriendlyName, DEVPROP_TYPE_BOOLEAN, DEVPROP_TYPE_BYTE,
+    DEVPROP_TYPE_STRING, DEVPROPTYPE,
 };
 use windows_sys::Win32::Foundation::{CloseHandle, DEVPROPKEY, GENERIC_READ, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::Storage::FileSystem::{CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING};
@@ -66,6 +67,10 @@ pub fn reg_string(key: &str, value: &str) -> Option<String> {
 /// Propiedad de batería de Bluetooth que mantiene Windows (la que muestra Configuración).
 const DEVPKEY_BLUETOOTH_BATTERY: DEVPROPKEY =
     DEVPROPKEY { fmtid: GUID::from_u128(0x104ea319_6ee2_4701_bd47_8ddbf425bbe5), pid: 2 };
+
+/// Si el dispositivo Bluetooth está conectado ahora mismo.
+const DEVPKEY_BLUETOOTH_CONNECTED: DEVPROPKEY =
+    DEVPROPKEY { fmtid: GUID::from_u128(0x83da6326_97a6_4088_9453_a1923f573b29), pid: 15 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BluetoothBattery {
@@ -127,6 +132,11 @@ fn bluetooth_battery_of(inst: u32) -> Option<u8> {
     (ty == DEVPROP_TYPE_BYTE && !buf.is_empty() && buf[0] <= 100).then_some(buf[0])
 }
 
+fn bluetooth_connected(inst: u32) -> Option<bool> {
+    let (ty, buf) = devnode_property(inst, &DEVPKEY_BLUETOOTH_CONNECTED)?;
+    (ty == DEVPROP_TYPE_BOOLEAN && !buf.is_empty()).then_some(buf[0] != 0)
+}
+
 /// Dispositivos Bluetooth con batería conocida por Windows (sin repetir nombres).
 pub fn bluetooth_batteries() -> Vec<BluetoothBattery> {
     let mut out: Vec<BluetoothBattery> = Vec::new();
@@ -150,6 +160,10 @@ pub fn bluetooth_batteries() -> Vec<BluetoothBattery> {
 pub fn read_bluetooth(instance_id: &str) -> RawReading {
     match locate(instance_id) {
         None => RawReading::absent(Presence::NotFound, "Bluetooth no presente"),
+        // Windows conserva la última batería aunque el dispositivo ya no esté conectado
+        Some(inst) if bluetooth_connected(inst) == Some(false) => {
+            RawReading::absent(Presence::Asleep, "Bluetooth desconectado")
+        }
         Some(inst) => match bluetooth_battery_of(inst) {
             Some(b) => RawReading {
                 presence: Presence::Online,

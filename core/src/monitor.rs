@@ -222,9 +222,10 @@ impl Monitor {
             let listen = asked || matches!(entry.source, Source::Listen { .. });
             let absent = (prev_presence == Some(Presence::NotFound) && !asked)
                 || (prev_presence == Some(Presence::Off) && !listen);
-            // El ciclo corre cada minuto si algún dispositivo solo se nota preguntándole: los que no
-            // dependen de eso siguen a su ritmo.
-            let own_pace = !matches!(entry.source, Source::Listen { .. } | Source::Ask { .. });
+            // El ciclo corre cada minuto si algún dispositivo solo se nota preguntándole. La batería HID
+            // estándar sí llega al dispositivo, así que sigue a su ritmo; el resto solo mira lo que ya sabe
+            // Windows o lo que ya se oyó.
+            let own_pace = matches!(entry.source, Source::HidStandard { .. });
             let rested = !own_pace || now - st.last_probe >= cfg.poll_seconds as f64 - POLL_MARGIN_S;
             let due = (!absent || now - st.last_probe >= ABSENT_RETRY_S) && rested;
 
