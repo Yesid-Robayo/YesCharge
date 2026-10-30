@@ -25,7 +25,7 @@ use yescharge_core::status::Snapshot;
 use yescharge_core::{ask, log, now_secs, trf};
 
 use crate::icon::TrayState;
-use crate::ipc::{self, MSG_QUIT, MSG_REFRESH, MSG_RELOAD, MSG_SNAPSHOT, MSG_TRAY, wide};
+use crate::ipc::{self, MSG_QUIT, MSG_REFRESH, MSG_RELOAD, MSG_RESUME, MSG_SNAPSHOT, MSG_TRAY, wide};
 use crate::tray::{self, Tray};
 
 /// Separación mínima entre ciclos, se pidan como se pidan: cada ciclo lee los dispositivos y escribe
@@ -39,6 +39,7 @@ const NIN_KEYSELECT: u32 = NIN_SELECT | 1;
 enum Cmd {
     Refresh,
     Reload,
+    Resume,
     /// Un dispositivo informó de un cambio: actualizar sin esperar a la próxima consulta.
     Changed,
     Quit,
@@ -184,6 +185,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             with_service(|s| s.tx.send(Cmd::Refresh));
             0
         }
+        MSG_RESUME => {
+            with_service(|s| s.tx.send(Cmd::Resume));
+            0
+        }
         MSG_RELOAD => {
             with_service(|s| s.tx.send(Cmd::Reload));
             crate::autostart::apply(Config::load().start_with_windows);
@@ -273,13 +278,18 @@ fn worker(hwnd: isize, rx: Receiver<Cmd>, notify: Sender<Cmd>, shared: Arc<Mutex
         else {
             break;
         };
-        force = next.force || next.reload;
-        if next.reload {
-            cfg = Config::load();
-            yescharge_core::i18n::set(cfg.language);
-            monitor.forget_removed(&cfg);
+        force = next.force || next.reload || next.resume;
+        if next.resume {
             monitor.resume_asking();
-            log::info(&format!("configuración recargada: {} dispositivos", cfg.devices.len()));
+        }
+        if next.reload {
+            // un archivo ilegible no debe borrar el historial: se sigue con lo que había
+            if let Some(loaded) = Config::try_load() {
+                cfg = loaded;
+                yescharge_core::i18n::set(cfg.language);
+                monitor.forget_removed(&cfg);
+                log::info(&format!("configuración recargada: {} dispositivos", cfg.devices.len()));
+            }
         }
     }
 }
@@ -289,6 +299,7 @@ fn worker(hwnd: isize, rx: Receiver<Cmd>, notify: Sender<Cmd>, shared: Arc<Mutex
 struct Pending {
     force: bool,
     reload: bool,
+    resume: bool,
 }
 
 impl Pending {
@@ -297,6 +308,7 @@ impl Pending {
         match cmd {
             Cmd::Refresh => self.force = true,
             Cmd::Reload => self.reload = true,
+            Cmd::Resume => self.resume = true,
             Cmd::Changed => {}
             Cmd::Quit => return false,
         }
@@ -398,7 +410,7 @@ mod tests {
             tx.send(Cmd::Refresh).unwrap();
         }
         let start = Instant::now();
-        assert_eq!(wait_next(&rx, start, LONG, GAP), Some(Pending { force: true, reload: false }));
+        assert_eq!(wait_next(&rx, start, LONG, GAP), Some(Pending { force: true, ..Default::default() }));
         assert!(start.elapsed() >= GAP, "respeta la separación mínima");
         assert!(rx.try_recv().is_err(), "no queda ningún pedido en cola");
     }
@@ -418,7 +430,7 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         tx.send(Cmd::Reload).unwrap();
         let start = Instant::now();
-        assert_eq!(wait_next(&rx, start, LONG, LONG), Some(Pending { force: false, reload: true }));
+        assert_eq!(wait_next(&rx, start, LONG, LONG), Some(Pending { reload: true, ..Default::default() }));
         assert!(start.elapsed() < Duration::from_secs(1));
     }
 

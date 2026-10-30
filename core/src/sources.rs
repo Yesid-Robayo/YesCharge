@@ -157,6 +157,7 @@ pub fn read_bluetooth(instance_id: &str) -> RawReading {
                 charge: Charge::Unknown,
                 approximate: false,
                 no_percentage: false,
+                heard_only: false,
                 detail: "Bluetooth (Windows)".into(),
             },
             None => RawReading::absent(Presence::Asleep, "Bluetooth sin dato de batería"),
@@ -186,6 +187,7 @@ fn read_xinput_raw(slot: u8) -> Option<RawReading> {
                 charge: Charge::Charging,
                 approximate: true,
                 no_percentage: false,
+                heard_only: false,
                 detail: "XInput por cable".into(),
             });
         }
@@ -203,6 +205,7 @@ fn read_xinput_raw(slot: u8) -> Option<RawReading> {
             charge: Charge::Discharging,
             approximate: true,
             no_percentage: false,
+            heard_only: false,
             detail: "XInput".into(),
         })
     }
@@ -319,6 +322,7 @@ pub fn read_standard_battery(iface: &HidInterface) -> RawReading {
                 charge: Charge::Unknown,
                 approximate: false,
                 no_percentage: false,
+                heard_only: false,
                 detail: "HID estándar".into(),
             };
         }

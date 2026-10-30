@@ -142,6 +142,7 @@ impl Heard {
             charge: self.charge.map(|c| c.0).unwrap_or_default(),
             approximate: false,
             no_percentage: false,
+            heard_only: false,
             detail: "perfil de escucha".into(),
         }
     }
@@ -209,12 +210,16 @@ impl Hub {
         }
     }
 
-    /// Anota que está encendido aunque no se haya oído el aviso (por ejemplo, porque respondió).
-    pub fn mark_on(&mut self, p: &ListenProfile) {
+    /// Anota lo que respondió, por si se perdió algún aviso: lo último que se oyó no debe
+    /// contradecir a una respuesta más nueva.
+    pub fn mark_answered(&mut self, p: &ListenProfile, charge: Charge) {
         if let Some(l) = self.active.get(&key(p))
             && let Ok(mut h) = l.heard.lock()
         {
             h.off = false;
+            if charge != Charge::Unknown {
+                h.charge = Some((charge, crate::now_secs()));
+            }
         }
     }
 

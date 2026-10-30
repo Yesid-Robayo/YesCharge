@@ -13,6 +13,8 @@ your devices.**
 
 **English** · [Español](README.es.md) · [Changelog](CHANGELOG.md)
 
+<img src="docs/images/home.png" alt="YesCharge window with the battery of a mouse, a keyboard, a headset and a controller" width="380">
+
 </div>
 
 > [!WARNING]
@@ -39,6 +41,7 @@ YesCharge ask. That option is off, it's per device, and you have to accept a ris
 - [Install](#-install)
 - [How to use it](#-how-to-use-it)
 - [Settings](#%EF%B8%8F-settings)
+- [FAQ](#-faq)
 - [Technology](#-technology)
 - [Development](#-development)
 - [Credits](#-credits)
@@ -66,7 +69,7 @@ YesCharge ask. That option is off, it's per device, and you have to accept a ris
 - **Light**: one ~5 MB exe, no runtime to install. The tray part uses a few MB of memory; the window is a separate
   process that only exists while it's open.
 - **Optional local API** (off by default) for external screens.
-- **English and Spanish**: it follows your Windows language, and you can change it in the settings.
+- **Spanish and English**: it starts in Spanish, and you can change it in the settings.
 
 ## 🔋 How it reads the battery
 
@@ -123,9 +126,20 @@ What has been tried on a real PC so far:
 | Bluetooth battery from Windows | ✅ Read correctly on a Bluetooth device |
 | Listening engine (opening read-only, capture, analysis) | ✅ Working; automatic tests for the analysis |
 | Listening profiles with real 2.4 GHz devices | ⚠️ A 2.4 GHz headset gave its percentage, cable and power state (with its official software open; not tried with it closed). A 2.4 GHz mouse gives cable and link, but **not** its percentage. A keyboard is still to be tried |
-| Asking (headset, mouse, keyboard, controller) | ⚠️ It worked on the mouse, which answered 53 % when its official reading was about 50 %. A 2.4 GHz keyboard gave its percentage, charging and when it stops answering; its reading rises about 13 points near the cable because it's based on voltage. A 2.4 GHz headset gave its percentage, charging and power state through its wizard test, and a 2.4 GHz controller's state can be told from which USB device Windows sees. The mouse and the controller don't give a current percentage on the cable, so the app shows "Charging" with no number |
+| Asking | ✅ Tried on the 4 models in the table below; the cable and power steps were checked on each one |
 | Xbox-compatible controllers (XInput) | ⚠️ Implemented, not tried with a controller yet |
 | Standard HID battery | ⚠️ Implemented, no device that declares it has been tried |
+
+These are the models YesCharge can ask, and what you'll see with each one:
+
+| Model | Percentage | Charging | Off | When charging ends | How fast a change shows |
+|---|---|---|---|---|---|
+| SteelSeries Arctis Nova 5 | Yes | Yes | Yes | Alerts on reaching 100 % | At once (the number, every 5 min) |
+| MCHOSE L7 Ultra+ | Yes, without cable | Yes | Yes | Alerts if the mouse says it finished | At once |
+| Mars68 (CAROTMAS) | Yes; rises about 13 points near the cable | Yes | "Asleep or off" | Alerts on reaching 100, after the margin | Up to 1 min |
+| GameSir Nova 2 Lite | Yes, without cable | Yes | Yes | Can't be known | Up to 1 min |
+
+The fully charged alert hasn't been tried with a real full charge yet.
 
 If you try it with your device, an *issue* saying whether it worked (and which method it used) helps a lot.
 
@@ -167,12 +181,12 @@ icon → **Quit**.
 
 | Setting | What it does |
 |---|---|
-| Language | Same as Windows, Spanish or English. |
+| Language | Spanish (default) or English. |
 | Low battery / Fully charged | Turn each notification on or off. |
 | Repeat the low battery alert | Every how many minutes it reminds you while the battery stays low. |
 | Check the battery every | 1, 2, 5, 10 or 15 minutes. Devices that give no notice of their own are asked every minute. |
 | Idle | After this long without using the PC, it stops reading so it doesn't wake your devices. |
-| Start with Windows | Starts in the tray, without opening the window. |
+| Start with Windows | Off by default. Starts in the tray, without opening the window. |
 | Local API | Publishes the status on `http://127.0.0.1:<port>/v1/status` (and `/min`, a compact format). Off by default. |
 
 Each device also has its own low battery threshold and top-off margin (in its **Details**).
@@ -181,6 +195,38 @@ Each device also has its own low battery threshold and top-off margin (in its **
 status), `history.json` and `model.json` (history and learned battery life), `yescharge.log` (the log to attach to a
 bug report) and `captures\` (listening reports).
 
+## ❓ FAQ
+
+**Is it portable?** Yes. It's one exe with no installer: put it wherever you want. Your settings are kept in
+`%APPDATA%\YesCharge`.
+
+**Why does it take a while to change?** Some models give no notice of their own, so YesCharge asks them every minute. A
+change can take up to a minute to show.
+
+**What does "Asleep or off" mean?** That the device isn't answering. Many receivers can't tell asleep from off, so the app
+doesn't claim one or the other.
+
+**What does "Last known" mean?** It's the last thing known about the device: it hasn't said anything new, or the PC has
+been unused for a while and it isn't being asked, so as not to wake it.
+
+**Why does it say "Charging" with no number?** Some models don't give a current percentage on the cable. Showing the last
+one would be misleading, so the number comes back when you unplug it.
+
+**Why does the percentage jump when I plug it in?** Some keyboards calculate it from the voltage, and it rises near the
+cable. It goes back down when you unplug it.
+
+**How do I know it finished charging?** It depends on the model: see the table in [Testing status](#-testing-status). If
+the app can't know, check the light on the device.
+
+**Why doesn't it exactly match the official app?** A difference of a point or two is normal: each app rounds in its own
+way.
+
+**Does it use up my devices' battery?** Listening doesn't use any. Asking is a small request, at most once a minute, and
+never while the PC is idle.
+
+**Windows says it protected my PC.** The exe isn't signed with a paid certificate, so Windows doesn't recognize it. If the
+SHA256 matches, choose **More info → Run anyway**.
+
 ## 🔧 Technology
 
 - **Rust**, a single exe with no runtime. The tray part uses the Windows API directly; the window uses
@@ -188,7 +234,7 @@ bug report) and `captures\` (listening reports).
 - Windows `hid.dll` + SetupAPI for HID; CfgMgr32 for the Bluetooth battery; XInput for controllers.
 - Icons drawn in code (no image files): the exe icon is generated at build time.
 
-The design is explained in [docs/architecture.md](docs/architecture.md) (Spanish).
+The design is explained in [docs/architecture.md](docs/architecture.md).
 
 ## 💻 Development
 

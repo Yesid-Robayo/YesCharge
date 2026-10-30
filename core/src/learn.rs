@@ -167,9 +167,9 @@ impl Listener {
         self.samples.lock().map(|s| s.len()).unwrap_or(0)
     }
 
-    pub fn finish(self, vid: u16, pid: u16) -> Capture {
+    pub fn finish(mut self, vid: u16, pid: u16) -> Capture {
         self.stop.store(true, Ordering::Relaxed);
-        for t in self.threads {
+        for t in std::mem::take(&mut self.threads) {
             let _ = t.join();
         }
         let samples = std::mem::take(&mut *self.samples.lock().unwrap_or_else(|e| e.into_inner()));
@@ -188,6 +188,13 @@ impl Listener {
         };
         cap.findings = analyze(&cap);
         cap
+    }
+}
+
+/// Salir del asistente a mitad de la escucha también la detiene.
+impl Drop for Listener {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
     }
 }
 

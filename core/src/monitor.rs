@@ -52,6 +52,8 @@ struct Persisted {
     full_since: f64,
     #[serde(default)]
     known: Option<KnownReading>,
+    #[serde(default)]
+    ask_paused: bool,
 }
 
 pub struct Monitor {
@@ -78,14 +80,18 @@ pub fn read_source(source: &Source, hub: &mut crate::listen::Hub, ask_every: std
             // queda diciendo "apagado".
             if asked.presence == Presence::Online {
                 if let Some(p) = &profile {
-                    hub.mark_on(p);
+                    hub.mark_answered(p, asked.charge);
                 }
+                return asked;
+            }
+            // un error no se tapa con lo que se oyó: debe contar para dejar de preguntar
+            if asked.presence == Presence::Error {
                 return asked;
             }
             let mut reading = said_off(heard).unwrap_or_else(|| merge(asked, heard));
             // el aviso del cable llega antes que su siguiente pregunta
-            reading.no_percentage |= reading.charge == Charge::Charging
-                && crate::ask::find(query).is_some_and(crate::ask::no_percentage_on_cable);
+            reading.no_percentage |=
+                on_cable(reading.charge) && crate::ask::find(query).is_some_and(crate::ask::no_percentage_on_cable);
             reading
         }
         Source::Bluetooth { instance_id } => crate::sources::read_bluetooth(instance_id),
@@ -107,7 +113,12 @@ pub fn read_source(source: &Source, hub: &mut crate::listen::Hub, ask_every: std
 /// conectar el cable algunos dejan de hablar con el receptor sin estar apagados.
 fn said_off(heard: Option<HeardState>) -> Option<RawReading> {
     let h = heard?;
-    (h.off && h.charge != Some(Charge::Charging)).then(|| RawReading::absent(Presence::Off, "apagado"))
+    (h.off && !h.charge.is_some_and(on_cable))
+        .then(|| RawReading { heard_only: true, ..RawReading::absent(Presence::Off, "apagado") })
+}
+
+fn on_cable(charge: Charge) -> bool {
+    matches!(charge, Charge::Charging | Charge::Full)
 }
 
 /// Une lo que respondió al preguntarle con lo que avisó por su cuenta: la pregunta da el porcentaje
@@ -116,10 +127,10 @@ fn merge(asked: RawReading, heard: Option<HeardState>) -> RawReading {
     let charge = heard.and_then(|h| h.charge);
     match (asked.presence, charge) {
         // preguntado hace poco, pero sabemos su estado: no hace falta volver a preguntar
-        (Presence::Stale, Some(c)) => RawReading { presence: Presence::Online, charge: c, ..asked },
+        (Presence::Stale, Some(c)) => RawReading { presence: Presence::Online, charge: c, heard_only: true, ..asked },
         // por cable o dormido no responde, pero sigue cargando
-        (Presence::Asleep, Some(Charge::Charging)) => {
-            RawReading { presence: Presence::Online, charge: Charge::Charging, no_percentage: true, ..asked }
+        (Presence::Asleep, Some(c)) if on_cable(c) => {
+            RawReading { presence: Presence::Online, charge: c, no_percentage: true, heard_only: true, ..asked }
         }
         _ => asked,
     }
@@ -148,6 +159,7 @@ impl Monitor {
             let st = self.states.entry(id).or_default();
             st.full_since = p.full_since;
             st.known = p.known;
+            st.ask_paused = p.ask_paused;
         }
     }
 
@@ -155,8 +167,8 @@ impl Monitor {
         let map: HashMap<&String, Persisted> = self
             .states
             .iter()
-            .filter(|(_, s)| s.full_since > 0.0 || s.known.is_some())
-            .map(|(k, s)| (k, Persisted { full_since: s.full_since, known: s.known.clone() }))
+            .filter(|(_, s)| s.full_since > 0.0 || s.known.is_some() || s.ask_paused)
+            .map(|(k, s)| (k, Persisted { full_since: s.full_since, known: s.known.clone(), ask_paused: s.ask_paused }))
             .collect();
         if let Ok(j) = serde_json::to_vec(&map) {
             let _ = crate::paths::write_atomic(&crate::paths::state_file(), &j);
@@ -216,9 +228,18 @@ impl Monitor {
             // fuentes pasivas no llegan al dispositivo, y además un PC "inactivo" no significa que
             // no se use: se puede estar escuchando música con los auriculares.
             let idle_here = idle && !entry.source.is_passive();
-            let skip = st.ask_paused || (st.last.is_some() && !force && (idle_here || !due));
+            let skip = st.ask_paused || idle_here || (st.last.is_some() && !force && !due);
             if skip {
-                let mut cached = st.last.clone().unwrap_or_else(|| base_status(entry));
+                let mut cached = st.last.clone().unwrap_or_else(|| {
+                    // recién arrancado: lo último que se supo antes de cerrar la app
+                    let mut d = base_status(entry);
+                    d.presence = Presence::Stale;
+                    if let Some(k) = &st.known {
+                        d.battery = k.battery;
+                        d.last_seen = k.at as f64;
+                    }
+                    d
+                });
                 if st.ask_paused {
                     cached.presence = Presence::Paused;
                     cached.eta = tr("Dio errores: se dejó de preguntarle", "It gave errors: stopped asking it").into();
@@ -248,11 +269,12 @@ impl Monitor {
             }
             if asks {
                 match raw.presence {
-                    Presence::Online | Presence::Off => st.ask_failures = 0,
+                    Presence::Online | Presence::Off if !raw.heard_only => st.ask_failures = 0,
                     Presence::Error => {
                         st.ask_failures += 1;
                         if st.ask_failures >= ASK_TRIP_AFTER {
                             st.ask_paused = true;
+                            fresh = true;
                             crate::log::warn(&format!("{}: demasiados errores, se deja de preguntar", entry.id));
                             events.paused.push(entry.name.clone());
                         }
@@ -280,17 +302,19 @@ impl Monitor {
             ds.charge = charge;
             // Al conectar o quitar el cable el porcentaje salta (muchos lo calculan por voltaje): la
             // mediana mezclaría dos situaciones y tardaría minutos en ponerse al día.
-            let on_cable = |c| matches!(c, Charge::Charging | Charge::Full);
             if st.last.as_ref().is_some_and(|l| on_cable(l.charge) != on_cable(charge)) {
                 st.window.clear();
             }
             match battery_now {
                 Some(b) => {
-                    st.window.push(b);
-                    if st.window.len() > SMOOTH_WINDOW {
-                        st.window.remove(0);
+                    // lo que se repite de memoria no es una medición: no debe pesar en la mediana
+                    if raw.battery.is_some() {
+                        st.window.push(b);
+                        if st.window.len() > SMOOTH_WINDOW {
+                            st.window.remove(0);
+                        }
                     }
-                    let battery = median(&st.window);
+                    let battery = if st.window.is_empty() { b } else { median(&st.window) };
                     ds.battery = Some(battery);
                     ds.last_seen = now;
 
@@ -532,6 +556,62 @@ mod tests {
         assert!(snap.devices[0].full, "debe decir cargado");
         assert_eq!(ev.full.len(), 1, "debe avisar una vez");
         assert_eq!(snap.devices[0].battery, None);
+    }
+
+    #[test]
+    fn repeating_what_was_heard_does_not_freeze_the_percentage() {
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let heard = || RawReading {
+            presence: Presence::Online,
+            charge: Charge::Discharging,
+            heard_only: true,
+            ..Default::default()
+        };
+        let mut m = monitor();
+        let (mut now, mut level) = (1000.0, 60);
+        let mut last = None;
+        while level > 5 {
+            m.cycle(&c, 0.0, false, now, &mut |_| online(level, Charge::Discharging));
+            for _ in 0..4 {
+                now += 60.0;
+                last = Some(m.cycle(&c, 0.0, false, now, &mut |_| heard()).0);
+            }
+            now += 60.0;
+            level -= 5;
+        }
+        assert_eq!(last.unwrap().devices[0].battery, Some(20), "la mediana debe seguir a las mediciones reales");
+    }
+
+    #[test]
+    fn what_was_heard_does_not_hide_repeated_errors() {
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let heard = || RawReading {
+            presence: Presence::Online,
+            charge: Charge::Charging,
+            heard_only: true,
+            ..Default::default()
+        };
+        let mut m = monitor();
+        let mut paused = 0;
+        for i in 0..6 {
+            let now = 1000.0 + i as f64 * 120.0;
+            let (_, ev) = m.cycle(&c, 0.0, false, now, &mut |_| RawReading::absent(Presence::Error, "error"));
+            paused += ev.paused.len();
+            m.cycle(&c, 0.0, false, now + 60.0, &mut |_| heard());
+        }
+        assert_eq!(paused, 1, "tres errores seguidos deben detener las preguntas");
+    }
+
+    #[test]
+    fn asking_is_not_sent_on_startup_with_the_pc_idle() {
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let mut calls = 0;
+        let (snap, _) = monitor().cycle(&c, 9999.0, true, 1000.0, &mut |_| {
+            calls += 1;
+            online(50, Charge::Discharging)
+        });
+        assert_eq!(calls, 0);
+        assert_eq!(snap.devices[0].presence, Presence::Stale);
     }
 
     #[test]

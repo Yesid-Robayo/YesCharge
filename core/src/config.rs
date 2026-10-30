@@ -153,24 +153,37 @@ impl Default for Config {
             renotify_minutes: 10,
             poll_seconds: 300,
             idle_seconds: 120,
-            start_with_windows: true,
+            start_with_windows: false,
             api_enabled: false,
             api_port: 8765,
-            language: Language::Auto,
+            language: Language::Spanish,
         }
     }
 }
 
 impl Config {
     pub fn load() -> Self {
-        let Ok(text) = std::fs::read_to_string(crate::paths::config_file()) else {
-            return Self::default();
+        Self::try_load().unwrap_or_default()
+    }
+
+    /// `None` si el archivo existe pero no se puede leer. Se deja una copia aparte, porque el
+    /// próximo guardado lo sobrescribiría y con él se perderían los dispositivos.
+    pub fn try_load() -> Option<Self> {
+        let path = crate::paths::config_file();
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Some(Self::default()),
+            Err(e) => {
+                crate::log::warn(&format!("no se pudo leer config.json: {e}"));
+                return None;
+            }
         };
         match serde_json::from_str::<Config>(&text) {
-            Ok(c) => c.sanitized(),
+            Ok(c) => Some(c.sanitized()),
             Err(e) => {
-                crate::log::warn(&format!("config.json ilegible, se usan los valores por defecto: {e}"));
-                Self::default()
+                crate::log::warn(&format!("config.json ilegible, se guarda una copia: {e}"));
+                let _ = std::fs::copy(&path, path.with_extension("bad.json"));
+                None
             }
         }
     }

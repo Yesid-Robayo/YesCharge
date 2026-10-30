@@ -4,6 +4,8 @@
 //! Nada de esto envía datos al dispositivo, salvo que el usuario acepte el aviso de riesgo para
 //! preguntarle a un modelo del catálogo (ver `yescharge_core::ask`).
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
@@ -11,7 +13,7 @@ use eframe::egui::{self, Align2, CornerRadius, Rect, Sense, Stroke, StrokeKind, 
 use yescharge_core::ask::{self, Query};
 use yescharge_core::config::{Config, DeviceEntry, Source, new_id};
 use yescharge_core::hid::HidInterface;
-use yescharge_core::i18n::tr;
+use yescharge_core::i18n::{Language, tr};
 use yescharge_core::learn::{BatteryOption, Capture, FindingKind, Listener};
 use yescharge_core::probe::{self, Candidate, ProbeResult, ProbeStep, StepState, Tier, Transport};
 use yescharge_core::reading::{Charge, DeviceKind, KnownReading, Presence, RawReading};
@@ -48,13 +50,21 @@ struct AskTest {
     pending: Option<Receiver<RawReading>>,
     /// Respuesta de cada fase en la que se pregunta.
     answers: [Option<RawReading>; 5],
+    /// Si el usuario sale de la prueba, la pregunta que estaba esperando ya no se envía.
+    cancelled: Arc<AtomicBool>,
+}
+
+impl Drop for AskTest {
+    fn drop(&mut self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
 }
 
 impl AskTest {
     fn begin_phase(&mut self, phase: u8) {
         let settle = ASK_SETTLE_SECS[phase as usize];
         if settle > 0 {
-            self.pending = Some(ask_later(self.query, settle));
+            self.pending = Some(ask_later(self.query, settle, self.cancelled.clone()));
         }
     }
 
@@ -329,6 +339,7 @@ impl Wizard {
                         charge: Charge::Charging,
                         approximate: false,
                         no_percentage: false,
+                        heard_only: false,
                         detail: String::new(),
                     },
                     method: tr("Tu perfil de escucha", "Your listening profile").into(),
@@ -502,7 +513,8 @@ impl Wizard {
                 }
             }
             Stage::AskResult { cand, result, charging, power } => {
-                if ask_result(ui, cand, *charging, *power)
+                let percent = result.as_ref().is_some_and(|r| r.reading.battery.is_some());
+                if ask_result(ui, cand, percent, *charging, *power)
                     && let Some(r) = result.take()
                 {
                     next = Some(confirm(cand.clone(), r, None));
@@ -582,7 +594,7 @@ impl Wizard {
     }
 }
 
-fn spinner_block(ui: &mut egui::Ui, text: &str) {
+pub fn spinner_block(ui: &mut egui::Ui, text: &str) {
     ui.add_space(60.0);
     ui.vertical_centered(|ui| {
         ui.add(egui::Spinner::new().size(36.0).color(BRAND_A));
@@ -609,6 +621,9 @@ enum ListOut {
 
 fn list(ui: &mut egui::Ui, items: &[Candidate], show_all: &mut bool, has_devices: bool) -> ListOut {
     let mut out = ListOut::Stay;
+    if !has_devices {
+        language_choice(ui);
+    }
     widgets::muted(
         ui,
         tr(
@@ -691,6 +706,20 @@ fn list(ui: &mut egui::Ui, items: &[Candidate], show_all: &mut bool, has_devices
         }
     });
     out
+}
+
+/// La primera vez no hay otra forma de llegar a los ajustes.
+fn language_choice(ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+        for (language, label) in [(Language::Spanish, "Español"), (Language::English, "English")] {
+            let current = yescharge_core::i18n::is_english() == (language == Language::English);
+            if widgets::choice_chip(ui, label, current).clicked() {
+                let mut cfg = Config::load();
+                cfg.language = language;
+                super::save_config(&cfg);
+            }
+        }
+    });
 }
 
 fn start_probe(cand: Candidate) -> Stage {
@@ -926,12 +955,14 @@ fn start_asking(cand: Candidate, query: &'static Query) -> Stage {
 }
 
 /// Pregunta cuando el usuario ya tuvo tiempo de hacer lo que pide la fase y le toca el turno.
-fn ask_later(query: &'static Query, settle: u64) -> Receiver<RawReading> {
+fn ask_later(query: &'static Query, settle: u64, cancelled: Arc<AtomicBool>) -> Receiver<RawReading> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(settle));
-        std::thread::sleep(std::time::Duration::from_secs(ask::wait_secs(query)));
-        let _ = tx.send(ask::read(query.id, ask::MIN_GAP));
+        std::thread::sleep(Duration::from_secs(settle));
+        std::thread::sleep(Duration::from_secs(ask::wait_secs(query)));
+        if !cancelled.load(Ordering::Relaxed) {
+            let _ = tx.send(ask::read(query.id, ask::MIN_GAP));
+        }
     });
     rx
 }
@@ -949,12 +980,13 @@ fn ask_finished(cand: Candidate, test: AskTest, capture: &Capture, ifaces: &[Hid
         notices.is_some()
     ));
     let source = Source::Ask { query: test.query.id.into(), accepted_at: yescharge_core::now_secs() as u64, notices };
-    let result = ProbeResult { source, reading: test.first, method: tr("Preguntándoselo", "Asking it").into() };
+    let reading = test.first.clone();
+    let result = ProbeResult { source, reading, method: tr("Preguntándoselo", "Asking it").into() };
     Stage::AskResult { cand, result: Some(result), charging, power: off }
 }
 
 /// Resultado de la prueba. `true` cuando el usuario quiere seguir.
-fn ask_result(ui: &mut egui::Ui, cand: &Candidate, charging: bool, power: bool) -> bool {
+fn ask_result(ui: &mut egui::Ui, cand: &Candidate, percent: bool, charging: bool, power: bool) -> bool {
     cand_header(ui, cand);
     widgets::section_title(ui, tr("Lo que notamos", "What we noticed"));
     widgets::card(ui, |ui| {
@@ -962,7 +994,12 @@ fn ask_result(ui: &mut egui::Ui, cand: &Candidate, charging: bool, power: bool) 
             let (text, color) = if ok { (yes, GOOD) } else { (no, WARN) };
             ui.label(egui::RichText::new(text).font(theme::semibold(14.0)).color(color));
         };
-        line(ui, true, tr("Lee el porcentaje", "It reads the percentage"), "");
+        line(
+            ui,
+            percent,
+            tr("Lee el porcentaje", "It reads the percentage"),
+            tr("Con el cable puesto no da el porcentaje", "It gives no percentage while on the cable"),
+        );
         line(
             ui,
             charging,
@@ -990,10 +1027,16 @@ fn ask_result(ui: &mut egui::Ui, cand: &Candidate, charging: bool, power: bool) 
 
 /// Decide qué sigue según la respuesta a la primera pregunta.
 fn asked(cand: Candidate, query: &'static Query, reading: RawReading) -> Stage {
-    let answered = reading.battery.is_some() || reading.charge == Charge::Charging;
+    let answered = reading.battery.is_some() || matches!(reading.charge, Charge::Charging | Charge::Full);
     let text = match reading.presence {
         Presence::Online if answered => {
-            let test = AskTest { query, first: reading, pending: None, answers: Default::default() };
+            let test = AskTest {
+                query,
+                first: reading,
+                pending: None,
+                answers: Default::default(),
+                cancelled: Arc::new(AtomicBool::new(false)),
+            };
             return start_test(cand, Some(test));
         }
         Presence::Off => {
@@ -1330,6 +1373,7 @@ fn review(
             },
             approximate: false,
             no_percentage: false,
+            heard_only: false,
             detail: "perfil de escucha".into(),
         };
         let back = Stage::Review {
@@ -1469,7 +1513,7 @@ fn confirm_view(ui: &mut egui::Ui, c: &mut Confirm) -> ConfirmOut {
                 "Leído con: {}{}",
                 "Read with: {}{}",
                 c.method,
-                if c.reading.approximate { " (aproximado)" } else { "" }
+                if c.reading.approximate { tr(" (aproximado)", " (approximate)") } else { "" }
             ),
         );
     });

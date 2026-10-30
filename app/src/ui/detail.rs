@@ -152,7 +152,7 @@ impl Detail {
                 );
                 ui.add_space(6.0);
                 let label = if self.saved_at.is_some_and(|t| t.elapsed().as_secs() < 2) {
-                    tr("Guardado ✓", "Saved ✓")
+                    tr("Guardado", "Saved")
                 } else {
                     tr("Guardar cambios", "Save changes")
                 };
@@ -179,7 +179,7 @@ impl Detail {
                     && widgets::secondary_button(ui, tr("Volver a preguntarle", "Ask it again"), ui.available_width())
                         .clicked()
                 {
-                    crate::ipc::send(crate::ipc::MSG_RELOAD);
+                    crate::ipc::send(crate::ipc::MSG_RESUME);
                 }
             });
 

@@ -8,7 +8,7 @@
 //!
 //! Rutas: `/v1/status` (estado completo) y `/min` (formato compacto compatible con BatteryInfo).
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -45,7 +45,8 @@ pub fn start(port: u16, snapshot: Arc<Mutex<Snapshot>>) -> Result<(), String> {
 fn handle(stream: TcpStream, port: u16, snap: &Mutex<Snapshot>) -> std::io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
-    let mut reader = BufReader::new(stream.try_clone()?);
+    // el límite cubre también una primera línea sin fin, que nunca llegaría a la comprobación de abajo
+    let mut reader = BufReader::new(stream.try_clone()?.take(MAX_HEADER_BYTES as u64 + 1));
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
     let mut host = String::new();

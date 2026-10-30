@@ -35,10 +35,7 @@ impl Settings {
             widgets::section_title(ui, tr("Idioma", "Language"));
             widgets::card(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    let auto = tr("El de Windows", "Same as Windows");
-                    for (language, label) in
-                        [(Language::Auto, auto), (Language::Spanish, "Español"), (Language::English, "English")]
-                    {
+                    for (language, label) in [(Language::Spanish, "Español"), (Language::English, "English")] {
                         if widgets::choice_chip(ui, label, c.language == language).clicked() {
                             c.language = language;
                         }

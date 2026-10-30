@@ -14,6 +14,8 @@ pub const MSG_RELOAD: u32 = WM_APP + 2;
 pub const MSG_QUIT: u32 = WM_APP + 3;
 /// Uso interno del servicio: el hilo de consultas avisa de un estado nuevo.
 pub const MSG_SNAPSHOT: u32 = WM_APP + 4;
+/// El usuario pide volver a preguntar a los dispositivos en pausa por errores.
+pub const MSG_RESUME: u32 = WM_APP + 5;
 /// Uso interno del servicio: eventos del icono de la bandeja.
 pub const MSG_TRAY: u32 = WM_APP + 10;
 

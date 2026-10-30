@@ -47,7 +47,14 @@ A family covers many models with one logic, but it doesn't always fit the curren
 
 ### Models in the catalog
 
-Only models tried on a real device: SteelSeries Arctis Nova 5, MCHOSE L7 Ultra+, Mars68 (CAROTMAS) and GameSir Nova 2 Lite.
+Only models tried on a real device. What each one gives is in the [README](../README.md#-testing-status).
+
+| Model | What was learned |
+|---|---|
+| SteelSeries Arctis Nova 5 | It reports charging and power by itself, and answers with its percentage. |
+| MCHOSE L7 Ultra+ | It reports the cable and link by itself. On the cable it shows up as `3837:4016` and its percentage stops updating. |
+| Mars68 (CAROTMAS) | It sends nothing by itself. Its receiver answers whether the keyboard is reachable, and keeps handing out the last saved answer even when it isn't. Off with the cable it shows up as `3151:5030`. Its reading is based on voltage. |
+| GameSir Nova 2 Lite | Its state shows in the USB id alone: `3537:1098` wireless, `3537:100f` on the cable, `3537:2106` when only the receiver is left. |
 
 ### How a model is added
 
@@ -106,8 +113,14 @@ Una familia cubre muchos modelos con una sola lógica, pero no siempre cabe en e
 
 ### Modelos del catálogo
 
-Solo están los modelos probados en un dispositivo real: SteelSeries Arctis Nova 5, MCHOSE L7 Ultra+, Mars68 (CAROTMAS) y
-GameSir Nova 2 Lite.
+Solo están los modelos probados en un dispositivo real. Lo que da cada uno está en el [README](../README.es.md#-estado-de-las-pruebas).
+
+| Modelo | Qué se aprendió |
+|---|---|
+| SteelSeries Arctis Nova 5 | Avisa de la carga y del encendido por su cuenta, y responde con su porcentaje. |
+| MCHOSE L7 Ultra+ | Avisa del cable y del enlace por su cuenta. Por cable aparece como `3837:4016` y su porcentaje deja de actualizarse. |
+| Mars68 (CAROTMAS) | No envía nada por su cuenta. Su receptor responde si el teclado está disponible, y sigue entregando la última respuesta guardada aunque no lo esté. Apagado y con cable aparece como `3151:5030`. Su lectura va por voltaje. |
+| GameSir Nova 2 Lite | Su estado se ve solo por el identificador USB: `3537:1098` inalámbrico, `3537:100f` por cable, `3537:2106` cuando solo queda el receptor. |
 
 ### Cómo se añade un modelo
 

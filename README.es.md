@@ -13,6 +13,8 @@ dispositivos.**
 
 [English](README.md) · **Español** · [Cambios por versión](CHANGELOG.es.md)
 
+<img src="docs/images/home.png" alt="Ventana de YesCharge con la batería de un ratón, un teclado, unos auriculares y un mando" width="380">
+
 </div>
 
 > [!WARNING]
@@ -40,6 +42,7 @@ YesCharge les pregunte. Esa opción viene apagada, es por dispositivo y hay que 
 - [Instalar](#-instalar)
 - [Cómo se usa](#-cómo-se-usa)
 - [Ajustes](#%EF%B8%8F-ajustes)
+- [Preguntas frecuentes](#-preguntas-frecuentes)
 - [Tecnología](#-tecnología)
 - [Desarrollo](#-desarrollo)
 - [Créditos](#-créditos)
@@ -68,7 +71,7 @@ YesCharge les pregunte. Esa opción viene apagada, es por dispositivo y hay que 
 - **Ligera**: un exe de unos 5 MB, sin runtime que instalar. La parte de la bandeja ocupa pocos MB de memoria; la
   ventana es un proceso aparte que solo existe mientras está abierta.
 - **API local opcional** (desactivada por defecto) para pantallas externas.
-- **En español e inglés**: sigue el idioma de Windows, y puedes cambiarlo en los ajustes.
+- **En español e inglés**: empieza en español, y puedes cambiarlo en los ajustes.
 
 ## 🔋 Cómo lee la batería
 
@@ -125,9 +128,20 @@ Lo que se ha probado hasta ahora en un PC real:
 | Batería Bluetooth desde Windows | ✅ Leída bien en un dispositivo Bluetooth |
 | Motor de escucha (apertura en solo lectura, captura, análisis) | ✅ Funciona; pruebas automáticas del análisis |
 | Perfiles de escucha con dispositivos 2.4 GHz reales | ⚠️ Unos auriculares 2.4 GHz dieron su porcentaje, cable y encendido (con su software oficial abierto; sin probar con él cerrado). Un ratón 2.4 GHz da cable y enlace, pero **no** su porcentaje. Falta probar un teclado |
-| Preguntar (auriculares, ratón, teclado, mando) | ⚠️ Funcionó con el ratón, que respondió 53 % cuando su lectura oficial rondaba el 50 %. Un teclado 2.4 GHz dio su porcentaje, la carga y cuándo deja de responder; su lectura sube unos 13 puntos cerca del cable porque va por voltaje. Unos auriculares 2.4 GHz dieron su porcentaje, carga y encendido en la prueba del asistente, y el estado de un mando 2.4 GHz se distingue por el dispositivo USB que ve Windows. El ratón y el mando no dan su porcentaje actual por cable, así que la app muestra "Cargando" sin número |
+| Preguntar | ✅ Probado con los 4 modelos de la tabla de abajo; el cable y el apagado se comprobaron en cada uno |
 | Mandos compatibles con Xbox (XInput) | ⚠️ Implementado, todavía sin probar con un mando |
 | Batería HID estándar | ⚠️ Implementado, sin probar con un dispositivo que la declare |
+
+Estos son los modelos a los que YesCharge puede preguntar, y lo que verás con cada uno:
+
+| Modelo | Porcentaje | Cargando | Apagado | Cuando termina de cargar | Cuánto tarda en notarse un cambio |
+|---|---|---|---|---|---|
+| SteelSeries Arctis Nova 5 | Sí | Sí | Sí | Avisa al llegar al 100 % | Al momento (el número, cada 5 min) |
+| MCHOSE L7 Ultra+ | Sí, sin cable | Sí | Sí | Avisa si el ratón dice que terminó | Al momento |
+| Mars68 (CAROTMAS) | Sí; sube unos 13 puntos cerca del cable | Sí | "Dormido o apagado" | Avisa al llegar a 100, tras el margen | Hasta 1 min |
+| GameSir Nova 2 Lite | Sí, sin cable | Sí | Sí | No se puede saber | Hasta 1 min |
+
+El aviso de carga terminada todavía no se ha probado con una carga completa real.
 
 Si lo pruebas con tu dispositivo, un *issue* diciendo si funcionó (y con qué método) ayuda mucho.
 
@@ -170,12 +184,12 @@ icono → **Salir**.
 
 | Ajuste | Qué hace |
 |---|---|
-| Idioma | El de Windows, español o inglés. |
+| Idioma | Español (por defecto) o inglés. |
 | Batería baja / Carga completa | Activa o desactiva cada aviso. |
 | Repetir el aviso de batería baja | Cada cuántos minutos te lo recuerda mientras siga baja. |
 | Consultar la batería cada | 1, 2, 5, 10 o 15 minutos. A los dispositivos que no avisan por su cuenta se les pregunta cada minuto. |
 | Reposo | Tras ese tiempo sin usar el PC, deja de consultar para no despertar tus dispositivos. |
-| Iniciar con Windows | Arranca en la bandeja, sin abrir la ventana. |
+| Iniciar con Windows | Desactivado por defecto. Arranca en la bandeja, sin abrir la ventana. |
 | API local | Publica el estado en `http://127.0.0.1:<puerto>/v1/status` (y `/min`, un formato compacto). Desactivada por defecto. |
 
 Cada dispositivo tiene además su propio umbral de batería baja y su margen de carga (en sus **Detalles**).
@@ -183,6 +197,38 @@ Cada dispositivo tiene además su propio umbral de batería baja y su margen de 
 **Archivos:** todo se guarda en `%APPDATA%\YesCharge`: `config.json` (ajustes y dispositivos), `status.json` (último
 estado), `history.json` y `model.json` (historial y autonomía aprendida), `yescharge.log` (el log que se adjunta al
 avisar de un error) y `captures\` (informes de escucha).
+
+## ❓ Preguntas frecuentes
+
+**¿Es portable?** Sí. Es un solo exe sin instalador: ponlo donde quieras. Tus ajustes se guardan en
+`%APPDATA%\YesCharge`.
+
+**¿Por qué tarda en cambiar?** Algunos modelos no avisan por su cuenta, así que YesCharge les pregunta cada minuto. Un
+cambio puede tardar hasta un minuto en verse.
+
+**¿Qué significa "Dormido o apagado"?** Que el dispositivo no responde. Muchos receptores no distinguen entre los dos, así
+que la app no afirma ninguno.
+
+**¿Qué significa "Último dato"?** Es lo último que se supo del dispositivo: no ha dicho nada nuevo, o el PC lleva un rato
+sin usarse y no se le pregunta, para no despertarlo.
+
+**¿Por qué dice "Cargando" sin número?** Algunos modelos no dan su porcentaje actual por cable. Mostrar el último
+engañaría, así que el número vuelve cuando lo desconectas.
+
+**¿Por qué salta el porcentaje al conectarlo?** Algunos teclados lo calculan por el voltaje, y sube cerca del cable. Vuelve
+a bajar al desconectarlo.
+
+**¿Cómo sé que terminó de cargar?** Depende del modelo: mira la tabla del [estado de las pruebas](#-estado-de-las-pruebas).
+Si la app no puede saberlo, mira la luz del dispositivo.
+
+**¿Por qué no coincide exactamente con la app oficial?** Una diferencia de un punto o dos es normal: cada app redondea a
+su manera.
+
+**¿Gasta la batería de mis dispositivos?** Escuchar no gasta nada. Preguntar es una petición pequeña, como mucho una vez
+por minuto, y nunca con el PC inactivo.
+
+**Windows dice que protegió mi PC.** El exe no está firmado con un certificado de pago, así que Windows no lo reconoce. Si
+el SHA256 coincide, elige **Más información → Ejecutar de todas formas**.
 
 ## 🔧 Tecnología
 

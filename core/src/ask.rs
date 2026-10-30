@@ -616,6 +616,7 @@ fn charging_on_cable() -> RawReading {
         presence: Presence::Online,
         charge: Charge::Charging,
         no_percentage: true,
+        heard_only: true,
         detail: "conectado por cable".into(),
         ..Default::default()
     }
@@ -662,6 +663,7 @@ pub fn read(id: &str, every: Duration) -> RawReading {
                     charge,
                     approximate: false,
                     no_percentage: on_cable || battery.is_none(),
+                    heard_only: false,
                     detail: format!("pregunta {}", q.id),
                 };
             }
@@ -671,7 +673,7 @@ pub fn read(id: &str, every: Duration) -> RawReading {
             None => busy = true,
         }
     }
-    if on_cable {
+    if on_cable && failure.is_none() {
         return charging_on_cable();
     }
     match failure {

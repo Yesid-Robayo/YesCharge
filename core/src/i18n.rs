@@ -5,17 +5,13 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
-use windows_sys::Win32::Globalization::GetUserDefaultUILanguage;
-
-/// Idioma primario "español" de Windows.
-const LANG_SPANISH: u16 = 0x0a;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
-    /// Español si Windows está en español; si no, inglés.
+    /// `auto` es como se guardaba la opción "el de Windows", que ya no existe.
     #[default]
-    Auto,
+    #[serde(alias = "auto")]
     Spanish,
     English,
 }
@@ -24,12 +20,7 @@ static ENGLISH: AtomicBool = AtomicBool::new(false);
 
 /// Aplica el idioma a todo el proceso.
 pub fn set(language: Language) {
-    let english = match language {
-        Language::Spanish => false,
-        Language::English => true,
-        Language::Auto => unsafe { GetUserDefaultUILanguage() & 0x3ff != LANG_SPANISH },
-    };
-    ENGLISH.store(english, Ordering::Relaxed);
+    ENGLISH.store(language == Language::English, Ordering::Relaxed);
 }
 
 pub fn is_english() -> bool {
@@ -51,6 +42,12 @@ macro_rules! trf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_old_windows_option_loads_as_spanish() {
+        assert_eq!(serde_json::from_str::<Language>("\"auto\"").unwrap(), Language::Spanish);
+        assert_eq!(Language::default(), Language::Spanish);
+    }
 
     #[test]
     fn spanish_is_the_default_until_a_language_is_set() {

@@ -22,6 +22,10 @@ use widgets::Glyph;
 const WINDOW_TITLE: &str = "YesCharge";
 /// Separación mínima entre dos pulsaciones de "Actualizar".
 const REFRESH_GAP: Duration = Duration::from_secs(3);
+/// Tiempo mínimo de "Actualizando", para que se note que hizo algo aunque los datos no cambien.
+const REFRESH_MIN: Duration = Duration::from_millis(700);
+/// Si el servicio no responde en este tiempo, se deja de esperar.
+const REFRESH_MAX: Duration = Duration::from_secs(12);
 
 pub fn run() {
     unsafe {
@@ -95,6 +99,8 @@ struct App {
     service_up: bool,
     logo: TextureHandle,
     last_refresh: Option<Instant>,
+    /// Desde cuándo se espera un `status.json` más nuevo que el de ese momento.
+    refreshing: Option<(Instant, f64)>,
 }
 
 impl App {
@@ -130,6 +136,7 @@ impl App {
             service_up: ipc::service_running(),
             logo,
             last_refresh: None,
+            refreshing: None,
         };
         app.poll_files();
         app
@@ -137,7 +144,8 @@ impl App {
 
     /// Relee `status.json` si cambió y comprueba que el servicio siga vivo (cada segundo).
     fn poll_files(&mut self) {
-        if self.last_check.elapsed() < Duration::from_millis(900) {
+        let gap = if self.refreshing.is_some() { 200 } else { 900 };
+        if self.last_check.elapsed() < Duration::from_millis(gap) {
             return;
         }
         self.last_check = Instant::now();
@@ -151,11 +159,20 @@ impl App {
             self.cfg = Config::load();
         }
     }
+
+    fn finish_refresh(&mut self) {
+        let Some((since, from)) = self.refreshing else { return };
+        let arrived = self.snapshot.updated_at > from && since.elapsed() >= REFRESH_MIN;
+        if arrived || since.elapsed() >= REFRESH_MAX {
+            self.refreshing = None;
+        }
+    }
 }
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.poll_files();
+        self.finish_refresh();
         let ctx = ui.ctx().clone();
         let mut next: Option<Page> = None;
         egui::CentralPanel::default()
@@ -186,7 +203,7 @@ impl eframe::App for App {
             }
             self.page = p;
         }
-        if matches!(&self.page, Page::Add(w) if w.busy()) {
+        if matches!(&self.page, Page::Add(w) if w.busy()) || self.refreshing.is_some() {
             // animación continua a ~60 fps, solo en estas pantallas (sin tope iría al ritmo del
             // monitor, que puede ser de 240 Hz, gastando CPU sin verse mejor)
             ctx.request_repaint_after(Duration::from_millis(16));
@@ -271,6 +288,7 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
             // los clics seguidos se ignoran: no aportan nada y cada uno sería un ciclo completo
             if clicked && app.last_refresh.is_none_or(|t| t.elapsed() >= REFRESH_GAP) {
                 app.last_refresh = Some(Instant::now());
+                app.refreshing = Some((Instant::now(), app.snapshot.updated_at));
                 if !ipc::send(ipc::MSG_REFRESH) {
                     ipc::spawn_self("--background");
                 }
@@ -310,6 +328,10 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
     egui::ScrollArea::vertical().max_height(ui.available_height() - footer_h).auto_shrink([false, false]).show(
         ui,
         |ui| {
+            if app.refreshing.is_some() {
+                wizard::spinner_block(ui, tr("Actualizando…", "Updating…"));
+                return;
+            }
             if devices.is_empty() {
                 empty_state(ui);
             }

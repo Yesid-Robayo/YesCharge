@@ -17,7 +17,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Rust estable
@@ -34,9 +34,9 @@ jobs:
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item target\release\YesCharge.exe dist\
           $h = (Get-FileHash dist\YesCharge.exe -Algorithm SHA256).Hash.ToLower()
-          "$h  YesCharge.exe" | Out-File dist\SHA256SUMS.txt -Encoding ascii
+          [IO.File]::WriteAllText("$PWD\dist\SHA256SUMS.txt", "$h  YesCharge.exe`n")
       - name: Atestación de origen
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: dist/YesCharge.exe
       - name: Crear la release (borrador)
@@ -44,4 +44,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-        run: gh release create $env:TAG dist\YesCharge.exe dist\SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --draft --title "YesCharge $env:TAG" --notes "Notas en CHANGELOG.md / CHANGELOG.es.md."
+        run: |
+          $version = [regex]::Escape($env:TAG.TrimStart('v'))
+          function Notes($file) {
+            $text = (Get-Content $file -Raw -Encoding utf8) -replace "`r", ''
+            if ($text -notmatch "(?ms)^## $version\b[^\n]*\n(.*?)(?=^## |\z)") { throw "$file no tiene $env:TAG" }
+            $Matches[1].Trim()
+          }
+          "## English`n`n$(Notes CHANGELOG.md)`n`n## Español`n`n$(Notes CHANGELOG.es.md)" | Out-File dist\notes.md -Encoding utf8
+          gh release create $env:TAG dist\YesCharge.exe dist\SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --draft --title "YesCharge $env:TAG" --notes-file dist\notes.md

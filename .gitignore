@@ -12,6 +12,10 @@ model.json
 state.json
 captures/
 
+# Capturas USB: pueden incluir lo que se tecleó mientras se grababan
+*.pcap
+*.pcapng
+
 # Nunca subir claves, certificados ni secretos
 *.pem
 *.key

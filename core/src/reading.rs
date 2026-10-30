@@ -100,6 +100,9 @@ pub struct RawReading {
     /// El dispositivo no da su porcentaje ahora mismo (p. ej. cargando por cable): lo último que se
     /// supo ya no vale y no se debe mostrar como si fuera el nivel actual.
     pub no_percentage: bool,
+    /// No es una respuesta nueva: es lo último que avisó por su cuenta o lo que se ve sin preguntarle.
+    /// No demuestra que preguntarle funcione, ni aporta una medición.
+    pub heard_only: bool,
     /// Detalle para el log (nunca se muestra con datos personales).
     pub detail: String,
 }
