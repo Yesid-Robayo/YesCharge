@@ -2,8 +2,10 @@
 
 use eframe::egui::{self, Align2, Rect, Sense, Stroke, pos2, vec2};
 use yescharge_core::config::{Config, DeviceEntry, Source};
+use yescharge_core::i18n::tr;
 use yescharge_core::reading::{Charge, DeviceKind, Presence};
 use yescharge_core::status::DeviceStatus;
+use yescharge_core::trf;
 
 use super::theme::{self, *};
 use super::{Nav, widgets};
@@ -52,7 +54,7 @@ impl Detail {
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui, status: Option<&DeviceStatus>, now: f64) -> Nav {
-        if super::page_header(ui, "Detalles") {
+        if super::page_header(ui, tr("Detalles", "Details")) {
             return Nav::Home;
         }
         let mut nav = Nav::Stay;
@@ -68,7 +70,9 @@ impl Detail {
                     ),
                     None => (None, "—".into(), FAINT),
                 };
-                let sub = status.filter(|d| d.charge == Charge::Charging || d.topping_off).map(|_| "cargando");
+                let sub = status
+                    .filter(|d| d.charge == Charge::Charging || d.topping_off)
+                    .map(|_| tr("cargando", "charging"));
                 widgets::ring(ui, rect, level, color, &label, sub);
                 ui.add_space(8.0);
                 ui.label(egui::RichText::new(&self.name).font(theme::bold(20.0)));
@@ -81,7 +85,11 @@ impl Detail {
                     if d.presence == Presence::Stale && d.last_seen > 0.0 {
                         widgets::muted(
                             ui,
-                            format!("Último mensaje del dispositivo: {}", super::ago(now - d.last_seen)),
+                            trf!(
+                                "Último mensaje del dispositivo: {}",
+                                "Last message from the device: {}",
+                                super::ago(now - d.last_seen)
+                            ),
                         );
                     }
                 }
@@ -89,16 +97,16 @@ impl Detail {
             ui.add_space(8.0);
 
             if let Some(d) = status {
-                widgets::section_title(ui, "Últimas 24 horas");
+                widgets::section_title(ui, tr("Últimas 24 horas", "Last 24 hours"));
                 widgets::card(ui, |ui| history_chart(ui, d, now));
             }
 
-            widgets::section_title(ui, "Ajustes");
+            widgets::section_title(ui, tr("Ajustes", "Settings"));
             widgets::card(ui, |ui| {
-                ui.label(egui::RichText::new("Nombre").font(theme::semibold(13.5)));
+                ui.label(egui::RichText::new(tr("Nombre", "Name")).font(theme::semibold(13.5)));
                 ui.add(egui::TextEdit::singleline(&mut self.name).desired_width(f32::INFINITY).char_limit(48));
                 ui.add_space(4.0);
-                ui.label(egui::RichText::new("Tipo").font(theme::semibold(13.5)));
+                ui.label(egui::RichText::new(tr("Tipo", "Type")).font(theme::semibold(13.5)));
                 ui.horizontal_wrapped(|ui| {
                     for k in DeviceKind::ALL {
                         if widgets::choice_chip(ui, k.label(), self.kind == k).clicked() {
@@ -107,41 +115,69 @@ impl Detail {
                     }
                 });
                 ui.add_space(6.0);
-                let desc = format!("Cuando baje del {} %", self.threshold);
-                widgets::slider_row(ui, "Avisar con batería baja", &desc, &mut self.threshold, 5..=50, 1.0);
+                let desc = trf!("Cuando baje del {} %", "When it drops below {} %", self.threshold);
+                widgets::slider_row(
+                    ui,
+                    tr("Avisar con batería baja", "Alert on low battery"),
+                    &desc,
+                    &mut self.threshold,
+                    5..=50,
+                    1.0,
+                );
                 ui.add_space(4.0);
-                let desc = format!("Avisar \"cargado\" {} min después de llegar al 100 %", self.top_off);
-                widgets::slider_row(ui, "Margen de carga tras el 100 %", &desc, &mut self.top_off, 0..=120, 5.0);
+                let desc = trf!(
+                    "Avisar \"cargado\" {} min después de llegar al 100 %",
+                    "Say \"charged\" {} min after reaching 100 %",
+                    self.top_off
+                );
+                widgets::slider_row(
+                    ui,
+                    tr("Margen de carga tras el 100 %", "Charge margin after 100 %"),
+                    &desc,
+                    &mut self.top_off,
+                    0..=120,
+                    5.0,
+                );
                 ui.add_space(4.0);
                 widgets::setting_row(
                     ui,
-                    "Vigilar este dispositivo",
-                    "Si lo desactivas, no se consulta ni avisa",
+                    tr("Vigilar este dispositivo", "Watch this device"),
+                    tr(
+                        "Si lo desactivas, no se consulta ni avisa",
+                        "If you turn it off, it isn't checked and gives no alerts",
+                    ),
                     |ui| {
                         widgets::toggle(ui, &mut self.enabled);
                     },
                 );
                 ui.add_space(6.0);
                 let label = if self.saved_at.is_some_and(|t| t.elapsed().as_secs() < 2) {
-                    "Guardado ✓"
+                    tr("Guardado ✓", "Saved ✓")
                 } else {
-                    "Guardar cambios"
+                    tr("Guardar cambios", "Save changes")
                 };
                 if widgets::primary_button(ui, label, ui.available_width(), true).clicked() {
                     self.save();
                 }
             });
 
-            widgets::section_title(ui, "Cómo se lee");
+            widgets::section_title(ui, tr("Cómo se lee", "How it is read"));
             widgets::card(ui, |ui| {
                 ui.label(egui::RichText::new(&self.source).font(theme::semibold(14.0)));
                 if self.asks {
-                    widgets::muted(ui, "Le envía una pregunta de batería: aceptaste ese riesgo.");
+                    widgets::muted(
+                        ui,
+                        tr(
+                            "Le envía una pregunta de batería: aceptaste ese riesgo.",
+                            "It sends it a battery request: you accepted that risk.",
+                        ),
+                    );
                 } else {
-                    widgets::muted(ui, "Solo lectura: no se le envía nada.");
+                    widgets::muted(ui, tr("Solo lectura: no se le envía nada.", "Read-only: nothing is sent to it."));
                 }
                 if status.is_some_and(|d| d.presence == Presence::Paused)
-                    && widgets::secondary_button(ui, "Volver a preguntarle", ui.available_width()).clicked()
+                    && widgets::secondary_button(ui, tr("Volver a preguntarle", "Ask it again"), ui.available_width())
+                        .clicked()
                 {
                     crate::ipc::send(crate::ipc::MSG_RELOAD);
                 }
@@ -149,19 +185,29 @@ impl Detail {
 
             ui.add_space(8.0);
             if !self.confirm_remove {
-                if widgets::danger_button(ui, "Quitar dispositivo", ui.available_width()).clicked() {
+                if widgets::danger_button(ui, tr("Quitar dispositivo", "Remove device"), ui.available_width()).clicked()
+                {
                     self.confirm_remove = true;
                 }
             } else {
                 widgets::card(ui, |ui| {
-                    ui.label(egui::RichText::new("¿Quitar este dispositivo?").font(theme::semibold(14.5)));
-                    widgets::muted(ui, "Se borra también su historial y la autonomía aprendida.");
+                    ui.label(
+                        egui::RichText::new(tr("¿Quitar este dispositivo?", "Remove this device?"))
+                            .font(theme::semibold(14.5)),
+                    );
+                    widgets::muted(
+                        ui,
+                        tr(
+                            "Se borra también su historial y la autonomía aprendida.",
+                            "Its history and learned battery life are deleted too.",
+                        ),
+                    );
                     ui.horizontal(|ui| {
                         let w = (ui.available_width() - 10.0) / 2.0;
-                        if widgets::secondary_button(ui, "Cancelar", w).clicked() {
+                        if widgets::secondary_button(ui, tr("Cancelar", "Cancel"), w).clicked() {
                             self.confirm_remove = false;
                         }
-                        if widgets::danger_button(ui, "Sí, quitar", w).clicked() {
+                        if widgets::danger_button(ui, tr("Sí, quitar", "Yes, remove"), w).clicked() {
                             let mut cfg = Config::load();
                             cfg.devices.retain(|e| e.id != self.id);
                             super::save_config(&cfg);
@@ -192,7 +238,7 @@ fn history_chart(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) {
             FAINT,
         );
     }
-    for (h, label) in [(24.0, "-24 h"), (12.0, "-12 h"), (0.0, "ahora")] {
+    for (h, label) in [(24.0, "-24 h"), (12.0, "-12 h"), (0.0, tr("ahora", "now"))] {
         let x = plot.right() - plot.width() * (h / 24.0);
         let align = if h == 24.0 {
             Align2::LEFT_CENTER
@@ -209,7 +255,7 @@ fn history_chart(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) {
         p.text(
             plot.center(),
             Align2::CENTER_CENTER,
-            "Todavía no hay suficientes lecturas",
+            tr("Todavía no hay suficientes lecturas", "Not enough readings yet"),
             egui::FontId::proportional(12.5),
             MUTED,
         );

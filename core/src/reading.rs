@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::tr;
+
 /// Estado de carga tal como lo reporta el dispositivo.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -31,11 +33,11 @@ impl DeviceKind {
 
     pub fn label(self) -> &'static str {
         match self {
-            DeviceKind::Headset => "Auriculares",
-            DeviceKind::Mouse => "Ratón",
-            DeviceKind::Keyboard => "Teclado",
-            DeviceKind::Gamepad => "Mando",
-            DeviceKind::Other => "Otro",
+            DeviceKind::Headset => tr("Auriculares", "Headset"),
+            DeviceKind::Mouse => tr("Ratón", "Mouse"),
+            DeviceKind::Keyboard => tr("Teclado", "Keyboard"),
+            DeviceKind::Gamepad => tr("Mando", "Controller"),
+            DeviceKind::Other => tr("Otro", "Other"),
         }
     }
 }
@@ -45,7 +47,8 @@ impl DeviceKind {
 #[serde(rename_all = "snake_case")]
 pub enum Presence {
     Online,
-    /// Conectado pero sin responder (dormido o fuera de alcance).
+    /// Conectado pero sin responder: dormido, apagado o fuera de alcance. Muchos receptores no
+    /// distinguen entre esos casos.
     Asleep,
     /// Responde que está apagado.
     Off,
@@ -64,13 +67,13 @@ pub enum Presence {
 impl Presence {
     pub fn label(self) -> &'static str {
         match self {
-            Presence::Online => "Conectado",
-            Presence::Asleep => "Dormido",
-            Presence::Off => "Apagado",
-            Presence::NotFound => "No detectado",
-            Presence::Busy => "Ocupado",
-            Presence::Stale => "Último dato",
-            Presence::Paused => "En pausa por seguridad",
+            Presence::Online => tr("Conectado", "Connected"),
+            Presence::Asleep => tr("Dormido o apagado", "Asleep or off"),
+            Presence::Off => tr("Apagado", "Off"),
+            Presence::NotFound => tr("No detectado", "Not detected"),
+            Presence::Busy => tr("Ocupado", "Busy"),
+            Presence::Stale => tr("Último dato", "Last known"),
+            Presence::Paused => tr("En pausa por seguridad", "Paused for safety"),
             Presence::Error => "Error",
         }
     }
@@ -94,6 +97,9 @@ pub struct RawReading {
     pub charge: Charge,
     /// El porcentaje es una aproximación por niveles (p. ej. XInput: vacío/bajo/medio/lleno).
     pub approximate: bool,
+    /// El dispositivo no da su porcentaje ahora mismo (p. ej. cargando por cable): lo último que se
+    /// supo ya no vale y no se debe mostrar como si fuera el nivel actual.
+    pub no_percentage: bool,
     /// Detalle para el log (nunca se muestra con datos personales).
     pub detail: String,
 }

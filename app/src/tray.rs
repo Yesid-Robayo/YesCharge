@@ -176,10 +176,20 @@ pub fn show_menu(hwnd: HWND, lines: &[String]) -> usize {
             if !lines.is_empty() {
                 AppendMenuW(m, MF_SEPARATOR, 0, null());
             }
-            AppendMenuW(m, MF_STRING, CMD_OPEN, wide("Abrir YesCharge").as_ptr());
-            AppendMenuW(m, MF_STRING, CMD_REFRESH, wide("Actualizar ahora").as_ptr());
+            AppendMenuW(
+                m,
+                MF_STRING,
+                CMD_OPEN,
+                wide(yescharge_core::i18n::tr("Abrir YesCharge", "Open YesCharge")).as_ptr(),
+            );
+            AppendMenuW(
+                m,
+                MF_STRING,
+                CMD_REFRESH,
+                wide(yescharge_core::i18n::tr("Actualizar ahora", "Refresh now")).as_ptr(),
+            );
             AppendMenuW(m, MF_SEPARATOR, 0, null());
-            AppendMenuW(m, MF_STRING, CMD_QUIT, wide("Salir").as_ptr());
+            AppendMenuW(m, MF_STRING, CMD_QUIT, wide(yescharge_core::i18n::tr("Salir", "Quit")).as_ptr());
             let mut pt = POINT { x: 0, y: 0 };
             GetCursorPos(&mut pt);
             SetForegroundWindow(hwnd);

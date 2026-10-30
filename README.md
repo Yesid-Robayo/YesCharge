@@ -27,10 +27,6 @@ You pick your device from a list and YesCharge tests it, looking for a **safe** 
 one, it watches it from the tray, warns you when it's low and when it has finished charging, and learns how long the
 battery lasts.
 
-> [!NOTE]
-> For now the app's interface is **in Spanish**. The button names below are given as they appear in the app, with
-> their translation.
-
 **By default YesCharge only reads.** Some models only tell their battery when asked: for those you can choose to let
 YesCharge ask. That option is off, it's per device, and you have to accept a risk warning first.
 
@@ -70,6 +66,7 @@ YesCharge ask. That option is off, it's per device, and you have to accept a ris
 - **Light**: one ~5 MB exe, no runtime to install. The tray part uses a few MB of memory; the window is a separate
   process that only exists while it's open.
 - **Optional local API** (off by default) for external screens.
+- **English and Spanish**: it follows your Windows language, and you can change it in the settings.
 
 ## 🔋 How it reads the battery
 
@@ -106,7 +103,8 @@ for that model.
 - It's **off by default**, per device, and it needs you to accept a risk warning.
 - It only sends **that model's exact status request**, built into the exe. It can't be changed from any file.
 - It **never tries commands** on a device that isn't on the list, and never changes a setting.
-- At most **once a minute**, and never while the PC is idle.
+- At most **once a minute**, and never while the PC is idle. Models that give no notice of their own are asked at that
+  pace, because it's the only way to notice the cable or that they were turned off.
 - After **3 errors in a row** it stops asking until you tell it to resume.
 
 > [!CAUTION]
@@ -125,7 +123,7 @@ What has been tried on a real PC so far:
 | Bluetooth battery from Windows | ✅ Read correctly on a Bluetooth device |
 | Listening engine (opening read-only, capture, analysis) | ✅ Working; automatic tests for the analysis |
 | Listening profiles with real 2.4 GHz devices | ⚠️ A 2.4 GHz headset gave its percentage, cable and power state (with its official software open; not tried with it closed). A 2.4 GHz mouse gives cable and link, but **not** its percentage. A keyboard is still to be tried |
-| Asking (headset, mouse, keyboard, controller) | ⚠️ It worked on the mouse, which answered 53 % when its official reading was about 50 %. The headset, keyboard and controller requests come from the author's previous app and are still to be tried here |
+| Asking (headset, mouse, keyboard, controller) | ⚠️ It worked on the mouse, which answered 53 % when its official reading was about 50 %. A 2.4 GHz keyboard gave its percentage, charging and when it stops answering; its reading rises about 13 points near the cable because it's based on voltage. A 2.4 GHz headset gave its percentage, charging and power state through its wizard test, and a 2.4 GHz controller's state can be told from which USB device Windows sees. The mouse and the controller don't give a current percentage on the cable, so the app shows "Charging" with no number |
 | Xbox-compatible controllers (XInput) | ⚠️ Implemented, not tried with a controller yet |
 | Standard HID battery | ⚠️ Implemented, no device that declares it has been tried |
 
@@ -147,30 +145,32 @@ If you try it with your device, an *issue* saying whether it worked (and which m
 > The exe is not signed with a paid certificate, so Windows SmartScreen may warn you the first time. Choose **More
 > info → Run anyway** if the SHA256 matches.
 
-To uninstall: turn off *Iniciar con Windows* (*Start with Windows*) in the settings, right-click the tray icon →
-**Salir** (*Exit*), and delete the exe and the `%APPDATA%\YesCharge` folder.
+To uninstall: turn off *Start with Windows* in the settings, right-click the tray icon → **Quit**, and delete the exe and the `%APPDATA%\YesCharge` folder.
 
 ## 🎮 How to use it
 
-1. Open `YesCharge.exe`. The first time, the **Añadir dispositivo** (*Add device*) wizard opens.
+1. Open `YesCharge.exe`. The first time, the **Add device** wizard opens.
 2. Turn on your device and use it for a moment so it's awake. Pick it from the list.
 3. YesCharge tests the safe methods. If one works, it shows the percentage and asks you if it matches what you see on
-   the device or in its official app. Give it a name and press **Sí, añadir** (*Yes, add*).
-4. If it needs **your own profile**, turn it on, press **Ya está encendido: empezar a escuchar** (*Already on: start listening*) and follow the five steps
+   the device or in its official app. Give it a name and press **Yes, add it**.
+4. If it needs **your own profile**, turn it on, press **It's already on: start listening** and follow the five steps
    (without cable → plug the cable → unplug it → turn it off → turn it on), then pick which value matches your battery.
-5. From then on it lives in the **tray**: left click opens the window; right click shows each device's level and the
+5. If your model can be asked and you accept the risk warning, the wizard follows those same five steps and tells you
+   what it noticed. It takes a few minutes, because it asks at most once a minute. The last steps continue on their own.
+6. From then on it lives in the **tray**: left click opens the window; right click shows each device's level and the
    options.
 
 Closing the window doesn't close YesCharge: it keeps watching from the tray. To close it completely: right-click the
-icon → **Salir** (*Exit*).
+icon → **Quit**.
 
 ## ⚙️ Settings
 
 | Setting | What it does |
 |---|---|
+| Language | Same as Windows, Spanish or English. |
 | Low battery / Fully charged | Turn each notification on or off. |
-| Repeat the low battery notice | Every how many minutes it reminds you while the battery stays low. |
-| Read the battery every | 1, 2, 5, 10 or 15 minutes. |
+| Repeat the low battery alert | Every how many minutes it reminds you while the battery stays low. |
+| Check the battery every | 1, 2, 5, 10 or 15 minutes. Devices that give no notice of their own are asked every minute. |
 | Idle | After this long without using the PC, it stops reading so it doesn't wake your devices. |
 | Start with Windows | Starts in the tray, without opening the window. |
 | Local API | Publishes the status on `http://127.0.0.1:<port>/v1/status` (and `/min`, a compact format). Off by default. |

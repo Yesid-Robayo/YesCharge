@@ -151,15 +151,16 @@ pub enum Trend {
 }
 
 pub fn format_eta(hours: f64) -> String {
+    use crate::trf;
     let total = (hours * 60.0).round() as i64;
     let (d, rem) = (total / 1440, total % 1440);
     let (h, m) = (rem / 60, rem % 60);
     if d > 0 {
-        format!("~{d} d {h} h restantes")
+        trf!("~{d} d {h} h restantes", "~{d} d {h} h left")
     } else if h > 0 {
-        format!("~{h} h {m} min restantes")
+        trf!("~{h} h {m} min restantes", "~{h} h {m} min left")
     } else {
-        format!("~{m} min restantes")
+        trf!("~{m} min restantes", "~{m} min left")
     }
 }
 

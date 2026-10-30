@@ -104,12 +104,28 @@ pub struct Query {
     /// Avisos conocidos: dan el cable y el apagado al instante, sin esperar a la próxima pregunta.
     events: &'static [Event],
     pub targets: &'static [Target],
+    /// VID:PID con que aparece por USB al conectarle el cable estando apagado. Verlo basta para
+    /// saber que está cargando, sin enviarle nada.
+    on_cable: &'static [(u16, u16)],
+    /// VID:PID del receptor cuando no hay nada al otro lado. Verlo basta para saber que el
+    /// dispositivo está apagado, sin enviarle nada.
+    receiver_alone: &'static [(u16, u16)],
+    /// Consulta al receptor, antes de nada: dice si el dispositivo está al otro lado.
+    status: Option<Status>,
     /// Pasos que se ejecutan una sola vez antes de preguntar.
     prepare: &'static [Step],
     request: &'static [Step],
     attempts: u32,
     /// Respuestas a reunir antes de decidir el estado de carga (votación por mayoría).
     collect: u32,
+    parse: fn(&[u8]) -> Answer,
+}
+
+/// Pregunta al receptor. La responde él mismo, sin molestar al dispositivo.
+#[derive(Debug)]
+pub struct Status {
+    steps: &'static [Step],
+    /// `Data` si se le puede preguntar; `NotThis` si no está disponible.
     parse: fn(&[u8]) -> Answer,
 }
 
@@ -140,7 +156,8 @@ fn mchose(r: &[u8]) -> Answer {
         return Answer::NotThis; // dormido: responde vacío
     }
     let battery = r[11] ^ 0xff;
-    if battery > 100 {
+    // sin enlace, el receptor responde con ese byte vacío: no es que esté al 0 %
+    if battery == 0 || battery > 100 {
         return Answer::NotThis;
     }
     let charge = match r[12] ^ 0xff {
@@ -149,6 +166,16 @@ fn mchose(r: &[u8]) -> Answer {
         _ => Charge::Discharging,
     };
     Answer::Data { battery: Some(battery), charge }
+}
+
+/// `00 <respuesta lista> <batería> 00 <dormido> ...`. Apagado o dormido, el receptor lo indica sin
+/// distinguir cuál de los dos, y aun así sigue entregando la última respuesta guardada: esto es lo
+/// único fiable. Al perder o recuperar el enlace, la batería llega a 0 un momento.
+fn mars68_status(r: &[u8]) -> Answer {
+    if r.len() < 5 || r[4] == 1 || !(1..=100).contains(&r[2]) {
+        return Answer::NotThis;
+    }
+    Answer::Data { battery: Some(r[2]), charge: Charge::Unknown }
 }
 
 fn mars68(r: &[u8]) -> Answer {
@@ -188,6 +215,9 @@ pub static CATALOG: &[Query] = &[
             Event { usage_page: 0xff00, report_id: 0, tag: 0xb7, len: 65, at: 2, kind: EventKind::Battery { xor: 0 } },
         ],
         targets: &[target(0x1038, 0x2232, 0xffc0)],
+        on_cable: &[],
+        receiver_alone: &[],
+        status: None,
         prepare: &[],
         request: &[Step::Write(&[0x00, 0xb0]), Step::Read { timeout_ms: 1000, max_reads: 8 }],
         attempts: 1,
@@ -217,7 +247,11 @@ pub static CATALOG: &[Query] = &[
                 kind: EventKind::Battery { xor: 0xff },
             },
         ],
+        // por cable sigue dando el último porcentaje sin actualizarlo: no sirve como nivel actual
         targets: &[target(0x5253, 0x1020, 0xff01), target(0x3837, 0x4016, 0xff01)],
+        on_cable: &[(0x3837, 0x4016)],
+        receiver_alone: &[],
+        status: None,
         prepare: &[],
         request: &[Step::SetFeature(&MCHOSE_ASK), Step::Sleep(60), Step::GetFeature { report_id: 0x11, len: 64 }],
         attempts: 8,
@@ -229,10 +263,17 @@ pub static CATALOG: &[Query] = &[
         name: "Mars68",
         events: &[],
         targets: &[Target { vid: 0x3151, pid: 0x502b, usage_page: 0xffff, usage: Some(0x0002) }],
+        on_cable: &[(0x3151, 0x5030)],
+        receiver_alone: &[],
+        status: Some(Status {
+            steps: &[
+                Step::SetFeature(&[0x00, 0xf7, 0, 0, 0, 0, 0, 0, 0x08]),
+                Step::Sleep(30),
+                Step::GetFeature { report_id: 0, len: 65 },
+            ],
+            parse: mars68_status,
+        }),
         prepare: &[
-            Step::SetFeature(&[0x00, 0xf7, 0, 0, 0, 0, 0, 0, 0x08]),
-            Step::Sleep(30),
-            Step::GetFeature { report_id: 0, len: 65 },
             Step::SetFeature(&[0x00, 0x82, 0, 0, 0, 0, 0, 0, 0x7d]),
             Step::Sleep(30),
             Step::GetFeature { report_id: 0, len: 65 },
@@ -250,7 +291,11 @@ pub static CATALOG: &[Query] = &[
         id: "gamesir-nova-2-lite",
         name: "GameSir Nova 2 Lite",
         events: &[],
+        // inalámbrico es 1098; con cable, 100f; apagado solo queda el receptor, 2106
         targets: &[target(0x3537, 0x1098, 0xff7a), target(0x3537, 0x100f, 0xff7a)],
+        on_cable: &[(0x3537, 0x100f)],
+        receiver_alone: &[(0x3537, 0x2106)],
+        status: None,
         prepare: &[],
         request: &[
             Step::Drain { timeout_ms: 120, max: 32 },
@@ -270,6 +315,16 @@ pub fn find(id: &str) -> Option<&'static Query> {
 /// Petición comprobada para un VID:PID, si existe.
 pub fn for_device(vid: u16, pid: u16) -> Option<&'static Query> {
     CATALOG.iter().find(|q| q.targets.iter().any(|t| t.vid == vid && t.pid == pid))
+}
+
+/// Conectado por cable no da su porcentaje actual, aunque un aviso diga que está cargando.
+pub fn no_percentage_on_cable(q: &Query) -> bool {
+    !q.on_cable.is_empty()
+}
+
+/// Todos los VID:PID con que puede aparecer este modelo.
+pub fn usb_ids(q: &Query) -> impl Iterator<Item = (u16, u16)> + '_ {
+    q.targets.iter().map(|t| (t.vid, t.pid)).chain(q.on_cable.iter().chain(q.receiver_alone).copied())
 }
 
 /// Perfil de escucha con los avisos conocidos del modelo. `None` si no tiene.
@@ -365,10 +420,18 @@ fn majority(votes: &[Charge]) -> Charge {
 }
 
 pub fn execute(q: &Query, l: &mut dyn Link) -> Outcome {
+    let mut battery = None;
+    if let Some(status) = &q.status {
+        match run_steps(q, status.steps, l).map(|r| r.map(|r| (status.parse)(&r))) {
+            Ok(Some(Answer::Off)) => return Outcome::Off,
+            Ok(Some(Answer::Data { battery: b, .. })) => battery = b,
+            Ok(_) => return Outcome::NoResponse,
+            Err(e) => return Outcome::Failed(e),
+        }
+    }
     if let Err(e) = run_steps(q, q.prepare, l) {
         return Outcome::Failed(e);
     }
-    let mut battery = None;
     let mut votes = Vec::new();
     for _ in 0..q.attempts {
         let response = match run_steps(q, q.request, l) {
@@ -378,7 +441,7 @@ pub fn execute(q: &Query, l: &mut dyn Link) -> Outcome {
         match response.map(|r| (q.parse)(&r)) {
             Some(Answer::Off) => return Outcome::Off,
             Some(Answer::Data { battery: b, charge }) => {
-                battery = b.or(battery);
+                battery = battery.or(b);
                 votes.push(charge);
                 if votes.len() as u32 >= q.collect {
                     break;
@@ -388,7 +451,8 @@ pub fn execute(q: &Query, l: &mut dyn Link) -> Outcome {
         }
     }
     if votes.is_empty() {
-        return Outcome::NoResponse;
+        // el receptor ya dio la batería: solo falta saber si carga
+        return battery.map_or(Outcome::NoResponse, |b| Outcome::Data { battery: Some(b), charge: Charge::Unknown });
     }
     Outcome::Data { battery, charge: majority(&votes) }
 }
@@ -495,10 +559,15 @@ fn last_asked() -> &'static Mutex<HashMap<&'static str, Instant>> {
     MAP.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Segundos que faltan para poder volver a preguntar.
+/// Segundos que faltan para poder volver a preguntar, redondeados hacia arriba.
 pub fn wait_secs(q: &Query) -> u64 {
     let map = last_asked().lock().unwrap_or_else(|e| e.into_inner());
-    map.get(q.id).map_or(0, |t| MIN_GAP.saturating_sub(t.elapsed()).as_secs())
+    map.get(q.id).map_or(0, |t| MIN_GAP.saturating_sub(t.elapsed()).as_secs_f64().ceil() as u64)
+}
+
+fn asked_within(q: &Query, gap: Duration) -> bool {
+    let map = last_asked().lock().unwrap_or_else(|e| e.into_inner());
+    map.get(q.id).is_some_and(|t| t.elapsed() < gap)
 }
 
 /// Evita que dos procesos de YesCharge mezclen sus conversaciones con un dispositivo.
@@ -532,16 +601,30 @@ fn find_interface<'a>(t: &Target, all: &'a [HidInterface]) -> Option<&'a HidInte
     })
 }
 
-/// Pregunta la batería a un dispositivo del catálogo. Si se preguntó hace poco, no envía nada y
-/// devuelve `Presence::Stale`.
-pub fn read(id: &str) -> RawReading {
+fn is_connected(ids: &[(u16, u16)], all: &[HidInterface]) -> bool {
+    ids.iter().any(|&(vid, pid)| all.iter().any(|i| i.vid == vid && i.pid == pid))
+}
+
+/// Pregunta la batería a un dispositivo del catálogo. Si se preguntó hace menos de `every` (nunca
+/// menos de `MIN_GAP`), no envía nada y devuelve `Presence::Stale`.
+pub fn read(id: &str, every: Duration) -> RawReading {
     let Some(q) = find(id) else {
         return RawReading::absent(Presence::Error, "petición desconocida");
     };
-    if wait_secs(q) > 0 {
+    let all = hid::enumerate();
+    if is_connected(q.on_cable, &all) {
+        return RawReading {
+            presence: Presence::Online,
+            battery: None,
+            charge: Charge::Charging,
+            approximate: false,
+            no_percentage: true,
+            detail: "conectado por cable".into(),
+        };
+    }
+    if asked_within(q, every.max(MIN_GAP)) {
         return RawReading::absent(Presence::Stale, "preguntado hace poco");
     }
-    let all = hid::enumerate();
     let (mut found, mut busy) = (false, false);
     let mut failure = None;
     for t in q.targets {
@@ -567,6 +650,7 @@ pub fn read(id: &str) -> RawReading {
                     battery,
                     charge,
                     approximate: false,
+                    no_percentage: battery.is_none(),
                     detail: format!("pregunta {}", q.id),
                 };
             }
@@ -579,6 +663,7 @@ pub fn read(id: &str) -> RawReading {
     match failure {
         Some(HidError::Gone) => RawReading::absent(Presence::NotFound, "desconectado"),
         Some(e) => RawReading::absent(Presence::Error, e.to_string()),
+        None if !found && is_connected(q.receiver_alone, &all) => RawReading::absent(Presence::Off, "apagado"),
         None if !found => RawReading::absent(Presence::NotFound, "no detectado"),
         None if busy => RawReading::absent(Presence::Busy, "ocupado"),
         None => RawReading::absent(Presence::Asleep, "sin respuesta"),
@@ -676,12 +761,67 @@ mod tests {
         assert_eq!(execute(query("mchose-l7-ultra-plus"), &mut f), Outcome::NoResponse);
     }
 
+    const STATUS_AWAKE: &str = "00 00 48 00 00 01 01 01";
+
     #[test]
     fn keyboard_decides_charge_by_majority() {
         let frame = |c| format!("00 82 48 {c} 0a");
-        let mut f = Fake::with(&["00", "00", &frame("01"), &frame("00"), &frame("00")]);
+        let mut f = Fake::with(&[STATUS_AWAKE, "00", &frame("01"), &frame("00"), &frame("00")]);
         let o = execute(query("carotmas-mars68"), &mut f);
         assert_eq!(o, Outcome::Data { battery: Some(72), charge: Charge::Discharging });
+    }
+
+    #[test]
+    fn keyboard_charging_is_read_from_its_answer() {
+        let frame = "00 82 49 01 0a";
+        let mut f = Fake::with(&["00 00 49 00 00 01 01 01", "00", "00", frame, frame, frame]);
+        let o = execute(query("carotmas-mars68"), &mut f);
+        assert_eq!(o, Outcome::Data { battery: Some(73), charge: Charge::Charging });
+    }
+
+    #[test]
+    fn keyboard_plugged_in_while_off_shows_up_as_another_usb_device() {
+        let iface = |vid, pid| HidInterface {
+            path: String::new(),
+            vid,
+            pid,
+            version: 0,
+            usage_page: 0xffff,
+            usage: 2,
+            input_len: 0,
+            output_len: 0,
+            feature_len: 65,
+            product: String::new(),
+            manufacturer: String::new(),
+        };
+        let q = query("carotmas-mars68");
+        assert!(!is_connected(q.on_cable, &[iface(0x3151, 0x502b)]));
+        assert!(is_connected(q.on_cable, &[iface(0x3151, 0x502b), iface(0x3151, 0x5030)]));
+    }
+
+    #[test]
+    fn an_added_model_is_known_by_all_its_usb_ids() {
+        let source = crate::config::Source::Ask { query: "carotmas-mars68".into(), accepted_at: 1, notices: None };
+        assert_eq!(source.device_keys(), ["usb:3151:502b", "usb:3151:5030"]);
+        let source = crate::config::Source::Ask { query: "gamesir-nova-2-lite".into(), accepted_at: 1, notices: None };
+        assert_eq!(source.device_keys(), ["usb:3537:1098", "usb:3537:100f", "usb:3537:100f", "usb:3537:2106"]);
+    }
+
+    #[test]
+    fn mouse_receiver_without_link_is_not_zero_percent() {
+        let mut r = bytes::parse("11 f9 c8 c7 e9 bf dd fa fa ff ff ff ff").unwrap();
+        assert_eq!(mchose(&r), Answer::NotThis);
+        r[11] = 0xcc;
+        assert_eq!(mchose(&r), Answer::Data { battery: Some(51), charge: Charge::Discharging });
+    }
+
+    #[test]
+    fn keyboard_out_of_reach_ignores_the_saved_answer() {
+        for status in ["00 00 3d 00 01 01 01 01", "00 01 00 00 00 01 01 01"] {
+            let mut f = Fake::with(&[status, "00 82 3a 00 0a"]);
+            assert_eq!(execute(query("carotmas-mars68"), &mut f), Outcome::NoResponse);
+            assert_eq!(f.sent.len(), 1, "sin enlace no se le pregunta nada más");
+        }
     }
 
     #[test]

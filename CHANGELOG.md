@@ -19,6 +19,9 @@ First version.
 - **Asking, only if you accept**: supported models that only tell their battery when asked can be asked after a risk
   warning. It's off by default, per device, limited to verified requests, and it stops by itself after repeated errors.
   It covers 4 models.
+- **The wizard tests asked devices too**: it follows the same cable and power steps and tells you what it noticed. Models
+  that give no notice of their own are asked once a minute, the only way to notice those changes.
+- **English and Spanish**, following the Windows language or the one you pick in the settings.
 - **Tray icon** with the lowest level and a bolt while something charges; menu with every device's level.
 - **Notifications** for low battery (repeated while it stays low) and fully charged.
 - **Top-off margin** after 100 %, **learned battery life** and a **24-hour chart** for each device.

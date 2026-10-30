@@ -141,6 +141,7 @@ impl Heard {
             battery: self.battery.map(|b| b.0),
             charge: self.charge.map(|c| c.0).unwrap_or_default(),
             approximate: false,
+            no_percentage: false,
             detail: "perfil de escucha".into(),
         }
     }

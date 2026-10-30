@@ -17,11 +17,12 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_OVERLAPPED,
 };
 use yescharge_core::config::Config;
+use yescharge_core::i18n::tr;
 use yescharge_core::listen::Hub;
 use yescharge_core::monitor::{Monitor, read_source};
 use yescharge_core::reading::{Charge, Presence};
 use yescharge_core::status::Snapshot;
-use yescharge_core::{log, now_secs};
+use yescharge_core::{ask, log, now_secs, trf};
 
 use crate::icon::TrayState;
 use crate::ipc::{self, MSG_QUIT, MSG_REFRESH, MSG_RELOAD, MSG_SNAPSHOT, MSG_TRAY, wide};
@@ -222,6 +223,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
 fn worker(hwnd: isize, rx: Receiver<Cmd>, notify: Sender<Cmd>, shared: Arc<Mutex<Shared>>, api: Arc<Mutex<Snapshot>>) {
     let mut cfg = Config::load();
+    yescharge_core::i18n::set(cfg.language);
     let mut monitor = Monitor::new();
     let mut hub = Hub::new(move || {
         let _ = notify.send(Cmd::Changed);
@@ -230,7 +232,12 @@ fn worker(hwnd: isize, rx: Receiver<Cmd>, notify: Sender<Cmd>, shared: Arc<Mutex
     log::info(&format!("{} dispositivos configurados", cfg.devices.len()));
     loop {
         let idle = yescharge_core::idle::idle_seconds();
-        let (snap, events) = monitor.cycle(&cfg, idle, force, now_secs(), &mut |e| read_source(&e.source, &mut hub));
+        let poll = Duration::from_secs(cfg.poll_seconds as u64);
+        let (snap, events) = monitor.cycle(&cfg, idle, force, now_secs(), &mut |e| {
+            // con avisos no hace falta preguntarle tan seguido
+            let every = if force || e.source.only_by_asking() { ask::MIN_GAP } else { poll };
+            read_source(&e.source, &mut hub, every)
+        });
         let listening: Vec<_> = cfg.devices.iter().filter_map(|d| d.source.listens_to()).collect();
         hub.retain(&listening.iter().collect::<Vec<_>>());
         snap.save();
@@ -239,25 +246,37 @@ fn worker(hwnd: isize, rx: Receiver<Cmd>, notify: Sender<Cmd>, shared: Arc<Mutex
         }
         if let Ok(mut g) = shared.lock() {
             for (name, pct) in &events.low {
-                g.notices.push(("Batería baja".into(), format!("{name}: {pct} %. Conéctalo para cargarlo.")));
+                g.notices.push((
+                    tr("Batería baja", "Low battery").into(),
+                    trf!("{name}: {pct} %. Conéctalo para cargarlo.", "{name}: {pct} %. Plug it in to charge it."),
+                ));
             }
             for name in &events.full {
-                g.notices.push(("Carga completa".into(), format!("{name} ya está cargado. Puedes desconectarlo.")));
+                g.notices.push((
+                    tr("Carga completa", "Fully charged").into(),
+                    trf!("{name} ya está cargado. Puedes desconectarlo.", "{name} is charged. You can unplug it."),
+                ));
             }
             for name in &events.paused {
                 g.notices.push((
-                    "Preguntas en pausa".into(),
-                    format!("{name} dio errores al preguntarle y YesCharge dejó de hacerlo por seguridad."),
+                    tr("Preguntas en pausa", "Asking paused").into(),
+                    trf!(
+                        "{name} dio errores al preguntarle y YesCharge dejó de hacerlo por seguridad.",
+                        "{name} gave errors when asked and YesCharge stopped asking for safety."
+                    ),
                 ));
             }
             g.snapshot = snap;
         }
         unsafe { PostMessageW(hwnd as HWND, MSG_SNAPSHOT, 0, 0) };
-        let poll = Duration::from_secs(cfg.poll_seconds as u64);
-        let Some(next) = wait_next(&rx, Instant::now(), poll, MIN_CYCLE_GAP) else { break };
+        let Some(next) = wait_next(&rx, Instant::now(), Duration::from_secs(cfg.cycle_seconds() as u64), MIN_CYCLE_GAP)
+        else {
+            break;
+        };
         force = next.force || next.reload;
         if next.reload {
             cfg = Config::load();
+            yescharge_core::i18n::set(cfg.language);
             monitor.forget_removed(&cfg);
             monitor.resume_asking();
             log::info(&format!("configuración recargada: {} dispositivos", cfg.devices.len()));
@@ -331,7 +350,7 @@ fn menu_lines(s: &Snapshot) -> Vec<String> {
         .iter()
         .map(|d| match d.battery {
             Some(b) => format!("{}  —  {b} %{}", d.name, charge_mark(d)),
-            None if d.charge == Charge::Charging => format!("{}  —  cargando", d.name),
+            None if d.charge == Charge::Charging => trf!("{}  —  cargando", "{}  —  charging", d.name),
             None => format!("{}  —  {}", d.name, d.presence.label().to_lowercase()),
         })
         .collect()
@@ -339,7 +358,7 @@ fn menu_lines(s: &Snapshot) -> Vec<String> {
 
 fn tooltip(s: &Snapshot) -> String {
     if s.devices.is_empty() {
-        return "YesCharge · añade un dispositivo".into();
+        return tr("YesCharge · añade un dispositivo", "YesCharge · add a device").into();
     }
     let mut t = String::from("YesCharge");
     for d in &s.devices {

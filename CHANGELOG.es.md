@@ -18,6 +18,9 @@ Primera versión.
 - **Preguntar, solo si lo aceptas**: a los modelos compatibles que solo dicen su batería si se les pregunta se les puede
   preguntar tras un aviso de riesgo. Viene apagado, es por dispositivo, se limita a peticiones comprobadas y se detiene
   sola tras errores repetidos. Cubre 4 modelos.
+- **El asistente también prueba lo que se pregunta**: sigue los mismos pasos de cable y encendido y te dice qué notó. A
+  los modelos que no avisan por su cuenta se les pregunta cada minuto, la única forma de notar esos cambios.
+- **En español e inglés**, según el idioma de Windows o el que elijas en los ajustes.
 - **Icono en la bandeja** con el nivel más bajo y un rayo mientras algo carga; menú con el nivel de cada dispositivo.
 - **Avisos** de batería baja (se repite mientras siga baja) y de carga completa.
 - **Margen de carga** tras el 100 %, **autonomía aprendida** y **gráfica de 24 horas** de cada dispositivo.

@@ -138,7 +138,7 @@ pub fn bluetooth_batteries() -> Vec<BluetoothBattery> {
         let Some(battery) = bluetooth_battery_of(inst) else { continue };
         let name = devnode_string(inst, &DEVPKEY_Device_FriendlyName)
             .or_else(|| devnode_string(inst, &DEVPKEY_Device_DeviceDesc))
-            .unwrap_or_else(|| "Dispositivo Bluetooth".into());
+            .unwrap_or_else(|| crate::i18n::tr("Dispositivo Bluetooth", "Bluetooth device").into());
         if out.iter().any(|b| b.name == name) {
             continue;
         }
@@ -156,6 +156,7 @@ pub fn read_bluetooth(instance_id: &str) -> RawReading {
                 battery: Some(b),
                 charge: Charge::Unknown,
                 approximate: false,
+                no_percentage: false,
                 detail: "Bluetooth (Windows)".into(),
             },
             None => RawReading::absent(Presence::Asleep, "Bluetooth sin dato de batería"),
@@ -184,6 +185,7 @@ fn read_xinput_raw(slot: u8) -> Option<RawReading> {
                 battery: None,
                 charge: Charge::Charging,
                 approximate: true,
+                no_percentage: false,
                 detail: "XInput por cable".into(),
             });
         }
@@ -200,6 +202,7 @@ fn read_xinput_raw(slot: u8) -> Option<RawReading> {
             battery: Some(pct),
             charge: Charge::Discharging,
             approximate: true,
+            no_percentage: false,
             detail: "XInput".into(),
         })
     }
@@ -315,6 +318,7 @@ pub fn read_standard_battery(iface: &HidInterface) -> RawReading {
                 battery: Some(pct),
                 charge: Charge::Unknown,
                 approximate: false,
+                no_percentage: false,
                 detail: "HID estándar".into(),
             };
         }

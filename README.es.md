@@ -68,6 +68,7 @@ YesCharge les pregunte. Esa opción viene apagada, es por dispositivo y hay que 
 - **Ligera**: un exe de unos 5 MB, sin runtime que instalar. La parte de la bandeja ocupa pocos MB de memoria; la
   ventana es un proceso aparte que solo existe mientras está abierta.
 - **API local opcional** (desactivada por defecto) para pantallas externas.
+- **En español e inglés**: sigue el idioma de Windows, y puedes cambiarlo en los ajustes.
 
 ## 🔋 Cómo lee la batería
 
@@ -104,7 +105,8 @@ soporte para ese modelo.
 - Viene **apagado por defecto**, es por dispositivo y exige aceptar un aviso de riesgo.
 - Solo envía **la petición de estado exacta de ese modelo**, incluida en el exe. Ningún archivo puede cambiarla.
 - **Nunca prueba comandos** con un dispositivo que no esté en la lista, y nunca cambia un ajuste.
-- Como mucho **una vez por minuto**, y nunca con el PC inactivo.
+- Como mucho **una vez por minuto**, y nunca con el PC inactivo. A los modelos que no avisan por su cuenta se les
+  pregunta a ese ritmo, porque es la única forma de notar el cable o que los apagaron.
 - Tras **3 errores seguidos** deja de preguntar hasta que se lo indiques.
 
 > [!CAUTION]
@@ -123,7 +125,7 @@ Lo que se ha probado hasta ahora en un PC real:
 | Batería Bluetooth desde Windows | ✅ Leída bien en un dispositivo Bluetooth |
 | Motor de escucha (apertura en solo lectura, captura, análisis) | ✅ Funciona; pruebas automáticas del análisis |
 | Perfiles de escucha con dispositivos 2.4 GHz reales | ⚠️ Unos auriculares 2.4 GHz dieron su porcentaje, cable y encendido (con su software oficial abierto; sin probar con él cerrado). Un ratón 2.4 GHz da cable y enlace, pero **no** su porcentaje. Falta probar un teclado |
-| Preguntar (auriculares, ratón, teclado, mando) | ⚠️ Funcionó con el ratón, que respondió 53 % cuando su lectura oficial rondaba el 50 %. Las peticiones de auriculares, teclado y mando vienen de la app anterior del autor y falta probarlas aquí |
+| Preguntar (auriculares, ratón, teclado, mando) | ⚠️ Funcionó con el ratón, que respondió 53 % cuando su lectura oficial rondaba el 50 %. Un teclado 2.4 GHz dio su porcentaje, la carga y cuándo deja de responder; su lectura sube unos 13 puntos cerca del cable porque va por voltaje. Unos auriculares 2.4 GHz dieron su porcentaje, carga y encendido en la prueba del asistente, y el estado de un mando 2.4 GHz se distingue por el dispositivo USB que ve Windows. El ratón y el mando no dan su porcentaje actual por cable, así que la app muestra "Cargando" sin número |
 | Mandos compatibles con Xbox (XInput) | ⚠️ Implementado, todavía sin probar con un mando |
 | Batería HID estándar | ⚠️ Implementado, sin probar con un dispositivo que la declare |
 
@@ -156,7 +158,9 @@ borra el exe y la carpeta `%APPDATA%\YesCharge`.
    ves en el dispositivo o en su app oficial. Ponle un nombre y pulsa **Sí, añadir**.
 4. Si hace falta **tu propio perfil**, enciéndelo, pulsa **Ya está encendido: empezar a escuchar** y sigue los cinco pasos (sin cable → conecta el
    cable → quítalo → apágalo → enciéndelo); después elige qué valor coincide con tu batería.
-5. Desde entonces vive en la **bandeja**: clic izquierdo abre la ventana; clic derecho muestra el nivel de cada
+5. Si tu modelo se puede preguntar y aceptas el aviso de riesgo, el asistente sigue esos mismos cinco pasos y te dice qué
+   notó. Tarda unos minutos, porque pregunta como mucho una vez por minuto. Los últimos pasos siguen solos.
+6. Desde entonces vive en la **bandeja**: clic izquierdo abre la ventana; clic derecho muestra el nivel de cada
    dispositivo y las opciones.
 
 Cerrar la ventana no cierra YesCharge: sigue vigilando desde la bandeja. Para cerrarlo del todo: clic derecho en el
@@ -166,9 +170,10 @@ icono → **Salir**.
 
 | Ajuste | Qué hace |
 |---|---|
+| Idioma | El de Windows, español o inglés. |
 | Batería baja / Carga completa | Activa o desactiva cada aviso. |
 | Repetir el aviso de batería baja | Cada cuántos minutos te lo recuerda mientras siga baja. |
-| Consultar la batería cada | 1, 2, 5, 10 o 15 minutos. |
+| Consultar la batería cada | 1, 2, 5, 10 o 15 minutos. A los dispositivos que no avisan por su cuenta se les pregunta cada minuto. |
 | Reposo | Tras ese tiempo sin usar el PC, deja de consultar para no despertar tus dispositivos. |
 | Iniciar con Windows | Arranca en la bandeja, sin abrir la ventana. |
 | API local | Publica el estado en `http://127.0.0.1:<puerto>/v1/status` (y `/min`, un formato compacto). Desactivada por defecto. |

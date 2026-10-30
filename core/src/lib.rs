@@ -9,6 +9,7 @@ pub mod bytes;
 pub mod config;
 pub mod hid;
 pub mod history;
+pub mod i18n;
 pub mod idle;
 pub mod learn;
 pub mod listen;

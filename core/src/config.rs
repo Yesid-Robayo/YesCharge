@@ -3,7 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::{Language, tr};
 use crate::reading::{DeviceKind, KnownReading};
+use crate::trf;
 
 /// De dónde sale la batería de un dispositivo añadido.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,20 +21,47 @@ pub enum Source {
     Listen { profile: crate::listen::ListenProfile },
     /// Pregunta comprobada del catálogo (`ask`). Es lo único que envía datos: existe solo si el
     /// usuario aceptó el aviso de riesgo, y aquí se guarda solo el id, nunca los datos a enviar.
-    Ask { query: String, accepted_at: u64 },
+    Ask {
+        query: String,
+        accepted_at: u64,
+        /// Avisos que aprendió la prueba del asistente: dan el cable y el apagado sin preguntarle.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        notices: Option<crate::listen::ListenProfile>,
+    },
 }
 
 impl Source {
     pub fn label(&self) -> String {
         match self {
-            Source::Bluetooth { .. } => "Bluetooth · batería de Windows".into(),
-            Source::Xinput { slot } => format!("Mando XInput · ranura {}", slot + 1),
-            Source::HidStandard { vid, pid, .. } => format!("HID estándar · {vid:04x}:{pid:04x}"),
-            Source::Listen { profile } => format!("Mi perfil de escucha · {:04x}:{:04x}", profile.vid, profile.pid),
+            Source::Bluetooth { .. } => tr("Bluetooth · batería de Windows", "Bluetooth · battery from Windows").into(),
+            Source::Xinput { slot } => trf!("Mando XInput · ranura {}", "XInput controller · slot {}", slot + 1),
+            Source::HidStandard { vid, pid, .. } => {
+                trf!("HID estándar · {vid:04x}:{pid:04x}", "Standard HID · {vid:04x}:{pid:04x}")
+            }
+            Source::Listen { profile } => trf!(
+                "Mi perfil de escucha · {:04x}:{:04x}",
+                "My listening profile · {:04x}:{:04x}",
+                profile.vid,
+                profile.pid
+            ),
             Source::Ask { query, .. } => match crate::ask::find(query) {
-                Some(q) => format!("Le pregunta la batería · {}", q.name),
-                None => "Le pregunta la batería".into(),
+                Some(q) => trf!("Le pregunta la batería · {}", "Asks for its battery · {}", q.name),
+                None => tr("Le pregunta la batería", "Asks for its battery").into(),
             },
+        }
+    }
+
+    /// Con qué claves (`probe::Candidate::key`) aparece en el asistente el dispositivo de esta fuente.
+    pub fn device_keys(&self) -> Vec<String> {
+        use crate::probe::usb_key;
+        match self {
+            Source::Bluetooth { instance_id } => vec![format!("bt:{instance_id}")],
+            Source::Xinput { slot } => vec![format!("xinput:{slot}")],
+            Source::HidStandard { vid, pid, .. } => vec![usb_key(*vid, *pid)],
+            Source::Listen { profile } => vec![usb_key(profile.vid, profile.pid)],
+            Source::Ask { query, .. } => crate::ask::find(query)
+                .map(|q| crate::ask::usb_ids(q).map(|(vid, pid)| usb_key(vid, pid)).collect())
+                .unwrap_or_default(),
         }
     }
 
@@ -40,9 +69,23 @@ impl Source {
     pub fn listens_to(&self) -> Option<crate::listen::ListenProfile> {
         match self {
             Source::Listen { profile } => Some(profile.clone()),
-            Source::Ask { query, .. } => crate::ask::find(query).and_then(crate::ask::event_profile),
+            Source::Ask { query, notices, .. } => {
+                let known = crate::ask::find(query).and_then(crate::ask::event_profile);
+                match (known, notices) {
+                    (Some(mut k), Some(n)) => {
+                        k.signals.extend(n.signals.iter().cloned());
+                        Some(k)
+                    }
+                    (k, n) => k.or_else(|| n.clone()),
+                }
+            }
             _ => None,
         }
+    }
+
+    /// No avisa de nada por su cuenta: el cable y el apagado solo se notan al preguntarle.
+    pub fn only_by_asking(&self) -> bool {
+        matches!(self, Source::Ask { .. }) && self.listens_to().is_none()
     }
 
     /// Leerla no llega al dispositivo, así que no hay riesgo de despertarlo: se puede leer aunque
@@ -98,6 +141,7 @@ pub struct Config {
     /// API HTTP local (solo 127.0.0.1). Desactivada por defecto.
     pub api_enabled: bool,
     pub api_port: u16,
+    pub language: Language,
 }
 
 impl Default for Config {
@@ -112,6 +156,7 @@ impl Default for Config {
             start_with_windows: true,
             api_enabled: false,
             api_port: 8765,
+            language: Language::Auto,
         }
     }
 }
@@ -133,6 +178,17 @@ impl Config {
     pub fn save(&self) -> std::io::Result<()> {
         let json = serde_json::to_vec_pretty(&self.clone().sanitized()).map_err(std::io::Error::other)?;
         crate::paths::write_atomic(&crate::paths::config_file(), &json)
+    }
+
+    /// Cada cuánto corre el ciclo de consulta. Un dispositivo que no avisa de nada solo cambia de
+    /// estado al preguntarle: sin esto tardaría hasta `poll_seconds` en notarse que lo apagaron, lo
+    /// encendieron o lo conectaron.
+    pub fn cycle_seconds(&self) -> u32 {
+        if self.devices.iter().any(|d| d.enabled && d.source.only_by_asking()) {
+            self.poll_seconds.min(crate::ask::MIN_GAP.as_secs() as u32)
+        } else {
+            self.poll_seconds
+        }
     }
 
     /// Lleva cada valor a un rango sensato (el archivo lo puede editar cualquiera).

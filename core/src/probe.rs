@@ -11,7 +11,9 @@ use std::collections::BTreeMap;
 
 use crate::config::Source;
 use crate::hid::{self, HidInterface};
+use crate::i18n::tr;
 use crate::reading::{DeviceKind, Presence, RawReading};
+use crate::trf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Transport {
@@ -75,6 +77,11 @@ fn guess_kind(product: &str, ifaces: &[HidInterface]) -> DeviceKind {
     }
 }
 
+/// Identifica a un dispositivo USB o 2.4 GHz en la lista del asistente.
+pub fn usb_key(vid: u16, pid: u16) -> String {
+    format!("usb:{vid:04x}:{pid:04x}")
+}
+
 /// Todo lo conectado que podría tener batería, con lo más prometedor primero.
 pub fn candidates() -> Vec<Candidate> {
     let mut out = Vec::new();
@@ -91,15 +98,18 @@ pub fn candidates() -> Vec<Candidate> {
         let listenable = ifaces.iter().any(|i| i.is_vendor_defined() && i.input_len > 0);
         let product = ifaces.iter().map(|i| i.product.as_str()).find(|s| !s.is_empty()).unwrap_or("");
         let maker = ifaces.iter().map(|i| i.manufacturer.as_str()).find(|s| !s.is_empty()).unwrap_or("");
-        let title =
-            if product.is_empty() { format!("Dispositivo USB {vid:04x}:{pid:04x}") } else { product.to_string() };
+        let title = if product.is_empty() {
+            trf!("Dispositivo USB {vid:04x}:{pid:04x}", "USB device {vid:04x}:{pid:04x}")
+        } else {
+            product.to_string()
+        };
         let subtitle = if maker.is_empty() {
             format!("USB / 2.4 GHz · {vid:04x}:{pid:04x}")
         } else {
             format!("{maker} · {vid:04x}:{pid:04x}")
         };
         out.push(Candidate {
-            key: format!("usb:{vid:04x}:{pid:04x}"),
+            key: usb_key(vid, pid),
             kind: guess_kind(product, &ifaces),
             title,
             subtitle,
@@ -118,7 +128,7 @@ pub fn candidates() -> Vec<Candidate> {
             key: format!("bt:{}", bt.instance_id),
             kind: guess_kind(&bt.name, &[]),
             title: bt.name.clone(),
-            subtitle: format!("Bluetooth · Windows informa {} %", bt.battery),
+            subtitle: trf!("Bluetooth · Windows informa {} %", "Bluetooth · Windows reports {} %", bt.battery),
             transport: Transport::Bluetooth,
             vid_pid: None,
             interfaces: Vec::new(),
@@ -133,8 +143,12 @@ pub fn candidates() -> Vec<Candidate> {
         out.push(Candidate {
             key: format!("xinput:{slot}"),
             kind: DeviceKind::Gamepad,
-            title: format!("Mando XInput {}", slot + 1),
-            subtitle: "Mando compatible con Xbox · nivel aproximado".into(),
+            title: trf!("Mando XInput {}", "XInput controller {}", slot + 1),
+            subtitle: tr(
+                "Mando compatible con Xbox · nivel aproximado",
+                "Xbox-compatible controller · approximate level",
+            )
+            .into(),
             transport: Transport::Xinput,
             vid_pid: None,
             interfaces: Vec::new(),
@@ -169,9 +183,9 @@ pub enum Tier {
 impl Tier {
     pub fn title(self) -> &'static str {
         match self {
-            Tier::Windows => "Batería que ya conoce Windows",
-            Tier::Standard => "Batería HID estándar",
-            Tier::Listen => "Crear mi perfil escuchando",
+            Tier::Windows => tr("Batería que ya conoce Windows", "Battery Windows already knows"),
+            Tier::Standard => tr("Batería HID estándar", "Standard HID battery"),
+            Tier::Listen => tr("Crear mi perfil escuchando", "Create my profile by listening"),
         }
     }
 }
@@ -204,57 +218,108 @@ pub struct ProbeResult {
 pub fn probe(c: &Candidate, report: &mut dyn FnMut(ProbeStep)) -> Option<ProbeResult> {
     let step = |tier, state, detail: &str| ProbeStep { tier, state, detail: detail.into() };
 
-    report(step(Tier::Windows, StepState::Running, "Consultando a Windows…"));
+    report(step(Tier::Windows, StepState::Running, tr("Consultando a Windows…", "Asking Windows…")));
     match c.transport {
         Transport::Bluetooth => {
             let id = c.bt_instance.clone().unwrap_or_default();
             let r = crate::sources::read_bluetooth(&id);
             if r.battery.is_some() {
-                report(step(Tier::Windows, StepState::Found, "Windows informa la batería por Bluetooth."));
+                report(step(
+                    Tier::Windows,
+                    StepState::Found,
+                    tr("Windows informa la batería por Bluetooth.", "Windows reports the battery over Bluetooth."),
+                ));
                 return Some(ProbeResult {
                     source: Source::Bluetooth { instance_id: id },
                     reading: r,
                     method: "Bluetooth".into(),
                 });
             }
-            report(step(Tier::Windows, StepState::NotAvailable, "Windows no tiene el dato ahora mismo."));
+            report(step(
+                Tier::Windows,
+                StepState::NotAvailable,
+                tr("Windows no tiene el dato ahora mismo.", "Windows doesn't have that data right now."),
+            ));
             return None;
         }
         Transport::Xinput => {
             let slot = c.xinput_slot.unwrap_or(0);
             let r = crate::sources::read_xinput(slot);
             if r.presence == Presence::Online {
-                report(step(Tier::Windows, StepState::Found, "Windows informa el nivel del mando (4 niveles)."));
+                report(step(
+                    Tier::Windows,
+                    StepState::Found,
+                    tr(
+                        "Windows informa el nivel del mando (4 niveles).",
+                        "Windows reports the controller level (4 levels).",
+                    ),
+                ));
                 return Some(ProbeResult { source: Source::Xinput { slot }, reading: r, method: "XInput".into() });
             }
-            report(step(Tier::Windows, StepState::NotAvailable, "El mando ya no está conectado."));
+            report(step(
+                Tier::Windows,
+                StepState::NotAvailable,
+                tr("El mando ya no está conectado.", "The controller is no longer connected."),
+            ));
             return None;
         }
         Transport::Usb => report(step(
             Tier::Windows,
             StepState::NotAvailable,
-            "Es USB o 2.4 GHz: Windows solo conoce la batería de Bluetooth.",
+            tr(
+                "Es USB o 2.4 GHz: Windows solo conoce la batería de Bluetooth.",
+                "It's USB or 2.4 GHz: Windows only knows Bluetooth batteries.",
+            ),
         )),
     }
 
-    report(step(Tier::Standard, StepState::Running, "Buscando la batería estándar en su descriptor…"));
+    report(step(
+        Tier::Standard,
+        StepState::Running,
+        tr("Buscando la batería estándar en su descriptor…", "Looking for the standard battery in its descriptor…"),
+    ));
     for i in c.interfaces.iter().filter(|i| crate::sources::declares_standard_battery(i)) {
         let r = crate::sources::read_standard_battery(i);
         if r.battery.is_some() {
-            report(step(Tier::Standard, StepState::Found, "El dispositivo declara su batería de forma estándar."));
+            report(step(
+                Tier::Standard,
+                StepState::Found,
+                tr(
+                    "El dispositivo declara su batería de forma estándar.",
+                    "The device declares its battery in the standard way.",
+                ),
+            ));
             return Some(ProbeResult {
                 source: Source::HidStandard { vid: i.vid, pid: i.pid, usage_page: i.usage_page, usage: i.usage },
                 reading: r,
-                method: "HID estándar".into(),
+                method: tr("HID estándar", "Standard HID").into(),
             });
         }
     }
-    report(step(Tier::Standard, StepState::NotAvailable, "No declara la batería estándar (lo normal en 2.4 GHz)."));
+    report(step(
+        Tier::Standard,
+        StepState::NotAvailable,
+        tr(
+            "No declara la batería estándar (lo normal en 2.4 GHz).",
+            "It doesn't declare the standard battery (normal on 2.4 GHz).",
+        ),
+    ));
 
     if c.listenable {
-        report(step(Tier::Listen, StepState::Waiting, "Siguiente paso: escuchar lo que envía al conectar el cable."));
+        report(step(
+            Tier::Listen,
+            StepState::Waiting,
+            tr(
+                "Siguiente paso: escuchar lo que envía al conectar el cable.",
+                "Next step: listen to what it sends when you plug the cable.",
+            ),
+        ));
     } else {
-        report(step(Tier::Listen, StepState::NotAvailable, "No tiene interfaces del fabricante que escuchar."));
+        report(step(
+            Tier::Listen,
+            StepState::NotAvailable,
+            tr("No tiene interfaces del fabricante que escuchar.", "It has no manufacturer interfaces to listen to."),
+        ));
     }
     None
 }

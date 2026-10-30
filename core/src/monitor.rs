@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, DeviceEntry, Source};
 use crate::history::{History, format_eta};
+use crate::i18n::tr;
 use crate::listen::HeardState;
 use crate::reading::{Charge, KnownReading, Presence, RawReading};
 use crate::status::{DeviceStatus, Snapshot};
@@ -17,6 +18,8 @@ const SMOOTH_WINDOW: usize = 5;
 const ABSENT_RETRY_S: f64 = 600.0;
 /// Errores seguidos al preguntar antes de dejar de hacerlo.
 const ASK_TRIP_AFTER: u32 = 3;
+/// Holgura al comparar con el intervalo de consulta: un ciclo nunca cae justo en el segundo exacto.
+const POLL_MARGIN_S: f64 = 5.0;
 
 /// Lo que el servicio debe anunciar tras un ciclo.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -64,13 +67,13 @@ impl Default for Monitor {
 
 /// Lee una fuente configurada. Ninguna envía datos al dispositivo: Windows, la batería HID
 /// estándar (GET_REPORT) o la escucha de lo que el propio dispositivo emite.
-pub fn read_source(source: &Source, hub: &mut crate::listen::Hub) -> RawReading {
+pub fn read_source(source: &Source, hub: &mut crate::listen::Hub, ask_every: std::time::Duration) -> RawReading {
     match source {
         Source::Listen { profile } => hub.read(profile),
         Source::Ask { query, .. } => {
             let profile = source.listens_to();
             let heard = profile.as_ref().and_then(|p| hub.state(p));
-            let asked = crate::ask::read(query);
+            let asked = crate::ask::read(query, ask_every);
             // Responder demuestra que está encendido, aunque se perdiera el aviso: así nunca se
             // queda diciendo "apagado".
             if asked.presence == Presence::Online {
@@ -79,7 +82,11 @@ pub fn read_source(source: &Source, hub: &mut crate::listen::Hub) -> RawReading 
                 }
                 return asked;
             }
-            said_off(heard).unwrap_or_else(|| merge(asked, heard))
+            let mut reading = said_off(heard).unwrap_or_else(|| merge(asked, heard));
+            // el aviso del cable llega antes que su siguiente pregunta
+            reading.no_percentage |= reading.charge == Charge::Charging
+                && crate::ask::find(query).is_some_and(crate::ask::no_percentage_on_cable);
+            reading
         }
         Source::Bluetooth { instance_id } => crate::sources::read_bluetooth(instance_id),
         Source::Xinput { slot } => crate::sources::read_xinput(*slot),
@@ -112,7 +119,7 @@ fn merge(asked: RawReading, heard: Option<HeardState>) -> RawReading {
         (Presence::Stale, Some(c)) => RawReading { presence: Presence::Online, charge: c, ..asked },
         // por cable o dormido no responde, pero sigue cargando
         (Presence::Asleep, Some(Charge::Charging)) => {
-            RawReading { presence: Presence::Online, charge: Charge::Charging, ..asked }
+            RawReading { presence: Presence::Online, charge: Charge::Charging, no_percentage: true, ..asked }
         }
         _ => asked,
     }
@@ -193,11 +200,17 @@ impl Monitor {
                 st.known = entry.initial.clone();
             }
             let prev_presence = st.last.as_ref().map(|l| l.presence);
-            // Lo que se escucha ya está en memoria: un aviso de encendido no debe esperar al reintento.
-            let listen = matches!(entry.source, Source::Listen { .. } | Source::Ask { .. });
-            let absent =
-                matches!(prev_presence, Some(Presence::NotFound)) || (prev_presence == Some(Presence::Off) && !listen);
-            let due = !absent || now - st.last_probe >= ABSENT_RETRY_S;
+            // Lo que se escucha ya está en memoria, y a un dispositivo que no aparece conectado no se
+            // le envía nada: ninguno de los dos debe esperar al reintento para notar que volvió.
+            let asked = matches!(entry.source, Source::Ask { .. });
+            let listen = asked || matches!(entry.source, Source::Listen { .. });
+            let absent = (prev_presence == Some(Presence::NotFound) && !asked)
+                || (prev_presence == Some(Presence::Off) && !listen);
+            // El ciclo corre cada minuto si algún dispositivo solo se nota preguntándole: los que no
+            // dependen de eso siguen a su ritmo.
+            let own_pace = !matches!(entry.source, Source::Listen { .. } | Source::Ask { .. });
+            let rested = !own_pace || now - st.last_probe >= cfg.poll_seconds as f64 - POLL_MARGIN_S;
+            let due = (!absent || now - st.last_probe >= ABSENT_RETRY_S) && rested;
 
             // Con el PC inactivo no se pregunta a nadie, para no despertar a los periféricos. Las
             // fuentes pasivas no llegan al dispositivo, y además un PC "inactivo" no significa que
@@ -208,9 +221,10 @@ impl Monitor {
                 let mut cached = st.last.clone().unwrap_or_else(|| base_status(entry));
                 if st.ask_paused {
                     cached.presence = Presence::Paused;
-                    cached.eta = "Dio errores: se dejó de preguntarle".into();
+                    cached.eta = tr("Dio errores: se dejó de preguntarle", "It gave errors: stopped asking it").into();
                 } else if idle_here && cached.presence == Presence::Online {
-                    cached.presence = Presence::Asleep;
+                    // no se le ha preguntado: lo único cierto es que es lo último que se supo
+                    cached.presence = Presence::Stale;
                 }
                 cached.name = entry.name.clone();
                 cached.kind = entry.kind;
@@ -258,11 +272,18 @@ impl Monitor {
             let listening =
                 raw.presence == Presence::Online && matches!(entry.source, Source::Listen { .. } | Source::Ask { .. });
             let known = st.known.clone().filter(|_| listening);
-            let battery_now = raw.battery.or(known.as_ref().and_then(|k| k.battery));
+            let last_known = known.as_ref().and_then(|k| k.battery).filter(|_| !raw.no_percentage);
+            let battery_now = raw.battery.or(last_known);
             let charge_now =
                 if raw.charge == Charge::Unknown { known.map_or(raw.charge, |k| k.charge) } else { raw.charge };
             let charge = crate::reading::normalize(battery_now, charge_now);
             ds.charge = charge;
+            // Al conectar o quitar el cable el porcentaje salta (muchos lo calculan por voltaje): la
+            // mediana mezclaría dos situaciones y tardaría minutos en ponerse al día.
+            let on_cable = |c| matches!(c, Charge::Charging | Charge::Full);
+            if st.last.as_ref().is_some_and(|l| on_cable(l.charge) != on_cable(charge)) {
+                st.window.clear();
+            }
             match battery_now {
                 Some(b) => {
                     st.window.push(b);
@@ -291,8 +312,9 @@ impl Monitor {
                         Some(text) => text,
                         None => match self.history.estimate_hours(&entry.id, battery) {
                             Some(h) => format_eta(h),
-                            None => format!(
+                            None => crate::trf!(
                                 "Aprendiendo autonomía… ({} %)",
+                                "Learning battery life… ({} %)",
                                 (self.history.progress(&entry.id, battery) * 100.0).round()
                             ),
                         },
@@ -302,7 +324,7 @@ impl Monitor {
                     // p. ej. mando por cable: carga sin porcentaje
                     let battery = st.known.as_ref().and_then(|k| k.battery);
                     st.known = Some(KnownReading { battery, charge, at: now as u64 });
-                    ds.eta = "Cargando (sin porcentaje)".into();
+                    ds.eta = tr("Cargando (sin porcentaje)", "Charging (no percentage)").into();
                     ds.last_seen = now;
                 }
                 None => {
@@ -321,12 +343,12 @@ impl Monitor {
                     if stale && let Some(b) = ds.battery {
                         apply_low(st, entry, cfg, now, b, &ds, &mut events);
                     }
-                    ds.eta = if raw.presence == Presence::Off {
+                    ds.eta = if matches!(raw.presence, Presence::Off | Presence::Asleep) {
                         String::new() // ya lo dice el estado
                     } else if !stale {
                         raw.presence.label().into()
                     } else if ds.battery.is_none() && ds.charge == Charge::Unknown {
-                        "Esperando su primer mensaje".into()
+                        tr("Esperando su primer mensaje", "Waiting for its first message").into()
                     } else {
                         charge_eta(st, entry, now, &ds).unwrap_or_default()
                     };
@@ -344,7 +366,7 @@ impl Monitor {
         let snapshot = Snapshot {
             version: crate::VERSION.into(),
             updated_at: now,
-            next_poll_at: now + cfg.poll_seconds as f64,
+            next_poll_at: now + cfg.cycle_seconds() as f64,
             service_pid: std::process::id(),
             devices,
         };
@@ -401,12 +423,12 @@ fn apply_low(
 /// Texto de estado cuando está cargando; `None` si está en batería.
 fn charge_eta(st: &DeviceState, entry: &DeviceEntry, now: f64, ds: &DeviceStatus) -> Option<String> {
     if ds.full {
-        Some("Carga completa".into())
+        Some(tr("Carga completa", "Fully charged").into())
     } else if ds.topping_off {
         let rem = (entry.top_off_minutes as f64 * 60.0 - (now - st.full_since)).max(0.0);
-        Some(format!("Completando carga… (~{} min)", ((rem / 60.0).ceil() as u64).max(1)))
+        Some(crate::trf!("Completando carga… (~{} min)", "Topping off… (~{} min)", ((rem / 60.0).ceil() as u64).max(1)))
     } else if ds.charge == Charge::Charging {
-        Some("Cargando…".into())
+        Some(tr("Cargando…", "Charging…").into())
     } else {
         None
     }
@@ -475,6 +497,33 @@ mod tests {
     }
 
     #[test]
+    fn charging_without_a_percentage_does_not_show_the_old_number() {
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let mut m = monitor();
+        m.cycle(&c, 0.0, false, 1000.0, &mut |_| online(76, Charge::Discharging));
+        let on_cable = || RawReading {
+            presence: Presence::Online,
+            charge: Charge::Charging,
+            no_percentage: true,
+            ..Default::default()
+        };
+        let (snap, _) = m.cycle(&c, 0.0, false, 1060.0, &mut |_| on_cable());
+        assert_eq!((snap.devices[0].battery, snap.devices[0].charge), (None, Charge::Charging));
+        // al volver a ser inalámbrico, el número es otra vez real
+        let (snap, _) = m.cycle(&c, 0.0, false, 1120.0, &mut |_| online(80, Charge::Discharging));
+        assert_eq!(snap.devices[0].battery, Some(80));
+    }
+
+    #[test]
+    fn an_asked_device_that_disappeared_comes_back_at_once() {
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let mut m = monitor();
+        m.cycle(&c, 0.0, false, 1000.0, &mut |_| RawReading::absent(Presence::NotFound, "no detectado"));
+        let (snap, _) = m.cycle(&c, 0.0, false, 1060.0, &mut |_| online(78, Charge::Discharging));
+        assert_eq!(snap.devices[0].presence, Presence::Online);
+    }
+
+    #[test]
     fn idle_pc_does_not_poll_sources_that_reach_the_device() {
         let (mut m, c) = (monitor(), cfg_with(Source::HidStandard { vid: 1, pid: 2, usage_page: 6, usage: 32 }));
         let mut calls = 0;
@@ -487,7 +536,7 @@ mod tests {
             online(50, Charge::Discharging)
         });
         assert_eq!(calls, 1, "con el PC inactivo no se consulta");
-        assert_eq!(snap.devices[0].presence, Presence::Asleep);
+        assert_eq!(snap.devices[0].presence, Presence::Stale, "sin consultar no se afirma que esté dormido");
     }
 
     #[test]
@@ -532,7 +581,7 @@ mod tests {
         let c = cfg_with(Source::Listen { profile: listen_profile() });
         let (snap, _) = monitor().cycle(&c, 0.0, true, 1000.0, &mut |_| RawReading::absent(Presence::Stale, ""));
         assert_eq!(snap.devices[0].battery, None);
-        assert_eq!(snap.devices[0].eta, "Esperando su primer mensaje");
+        assert_eq!(snap.devices[0].eta, tr("Esperando su primer mensaje", "Waiting for its first message"));
     }
 
     #[test]
@@ -559,7 +608,7 @@ mod tests {
             ..Default::default()
         });
         let d = &snap.devices[0];
-        assert_eq!((d.battery, d.charge, d.eta.as_str()), (Some(46), Charge::Charging, "Cargando…"));
+        assert_eq!((d.battery, d.charge, d.eta.as_str()), (Some(46), Charge::Charging, tr("Cargando…", "Charging…")));
     }
 
     #[test]
@@ -576,7 +625,7 @@ mod tests {
 
     #[test]
     fn repeated_errors_stop_the_questions_until_the_user_resumes() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1 });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
         let mut m = monitor();
         let mut calls = 0;
         let mut paused = 0;
@@ -602,7 +651,7 @@ mod tests {
 
     #[test]
     fn asking_never_happens_with_the_pc_idle() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1 });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
         let mut m = monitor();
         let mut calls = 0;
         m.cycle(&c, 0.0, false, 1000.0, &mut |_| {
@@ -618,7 +667,7 @@ mod tests {
 
     #[test]
     fn a_question_too_soon_keeps_the_device_as_it_was() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1 });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, true, 1000.0, &mut |_| online(50, Charge::Discharging));
         let (snap, _) = m.cycle(&c, 0.0, true, 1010.0, &mut |_| RawReading::absent(Presence::Stale, ""));
@@ -659,7 +708,7 @@ mod tests {
 
     #[test]
     fn a_charge_notice_keeps_the_percentage_for_an_asking_device() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1 });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, true, 1000.0, &mut |_| online(53, Charge::Discharging));
         let notice = merge(RawReading::absent(Presence::Stale, ""), heard(false, Some(Charge::Charging)));
@@ -670,7 +719,7 @@ mod tests {
 
     #[test]
     fn turning_an_asking_device_on_shows_at_once() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1 });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, false, 1000.0, &mut |_| online(53, Charge::Discharging));
         m.cycle(&c, 0.0, false, 1010.0, &mut |_| RawReading::absent(Presence::Off, "apagado"));

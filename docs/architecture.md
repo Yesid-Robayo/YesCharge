@@ -56,6 +56,7 @@ YesCharge.exe [--background]        YesCharge.exe --window
 | `listen` | Perfiles de escucha del usuario. Un perfil es una lista de señales (batería, carga), porque un dispositivo puede dar cada dato en un mensaje e interfaz distintos. Hay una escucha de fondo por interfaz que guarda lo último que se oyó. |
 | `monitor` | Ciclo de consulta: suavizado por mediana, margen tras el 100 %, avisos con repetición, tendencia, autonomía y la regla de no consultar con el PC inactivo. |
 | `history` | Historial de 24 h y modelo de autonomía aprendido por tramos de 10 % (el de BatteryInfo). |
+| `i18n` | Idioma de la interfaz: cada texto va en su sitio en los dos idiomas (`tr`, `trf!`). Los logs no se traducen. |
 | `config`, `status`, `paths`, `log` | Archivos de `%APPDATA%\YesCharge`, siempre validados y escritos de forma atómica. |
 
 ## Flujo del asistente

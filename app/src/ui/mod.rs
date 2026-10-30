@@ -10,8 +10,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 use eframe::egui::{self, Align2, Color32, CornerRadius, Rect, Sense, Stroke, StrokeKind, TextureHandle, pos2, vec2};
 use yescharge_core::config::Config;
+use yescharge_core::i18n::tr;
 use yescharge_core::reading::{Charge, Presence};
 use yescharge_core::status::{DeviceStatus, Snapshot};
+use yescharge_core::trf;
 
 use crate::ipc::{self, wide};
 use theme::*;
@@ -37,6 +39,7 @@ pub fn run() {
             return;
         }
         yescharge_core::log::init("ventana");
+        yescharge_core::i18n::set(Config::load().language);
         let icon = crate::icon::app_icon(64);
         let options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
@@ -207,32 +210,32 @@ fn header(ui: &mut egui::Ui, logo: &TextureHandle, title: &str, subtitle: &str) 
 pub fn ago(secs: f64) -> String {
     let s = secs.max(0.0) as u64;
     match s {
-        0..=59 => "hace unos segundos".into(),
-        60..=3599 => format!("hace {} min", s / 60),
-        3600..=86399 => format!("hace {} h", s / 3600),
-        _ => format!("hace {} d", s / 86400),
+        0..=59 => tr("hace unos segundos", "a few seconds ago").into(),
+        60..=3599 => trf!("hace {} min", "{} min ago", s / 60),
+        3600..=86399 => trf!("hace {} h", "{} h ago", s / 3600),
+        _ => trf!("hace {} d", "{} d ago", s / 86400),
     }
 }
 
 /// Texto y color del estado de un dispositivo.
 pub fn status_of(d: &DeviceStatus) -> (&'static str, Color32) {
     if d.full {
-        ("Cargado", GOOD)
+        (tr("Cargado", "Charged"), GOOD)
     } else if d.topping_off {
-        ("Completando carga", CHARGE)
+        (tr("Completando carga", "Topping off"), CHARGE)
     } else if d.charge == Charge::Charging {
-        ("Cargando", CHARGE)
+        (tr("Cargando", "Charging"), CHARGE)
     } else if d.low {
-        ("Batería baja", LOW)
+        (tr("Batería baja", "Low battery"), LOW)
     } else {
         match d.presence {
-            Presence::Online => ("En uso", MUTED),
-            Presence::Asleep => ("Dormido", FAINT),
-            Presence::Off => ("Apagado", FAINT),
-            Presence::NotFound => ("No detectado", FAINT),
-            Presence::Busy => ("Ocupado por otro programa", WARN),
-            Presence::Stale => ("Último dato", MUTED),
-            Presence::Paused => ("En pausa por seguridad", WARN),
+            Presence::Online => (tr("En uso", "In use"), MUTED),
+            Presence::Asleep => (tr("Dormido o apagado", "Asleep or off"), FAINT),
+            Presence::Off => (tr("Apagado", "Off"), FAINT),
+            Presence::NotFound => (tr("No detectado", "Not detected"), FAINT),
+            Presence::Busy => (tr("Ocupado por otro programa", "Busy with another program"), WARN),
+            Presence::Stale => (tr("Último dato", "Last known"), MUTED),
+            Presence::Paused => (tr("En pausa por seguridad", "Paused for safety"), WARN),
             Presence::Error => ("Error", LOW),
         }
     }
@@ -255,16 +258,16 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
     ui.horizontal(|ui| {
         let n = app.snapshot.devices.len();
         let sub = match n {
-            0 => "Sin dispositivos todavía".to_string(),
-            1 => "1 dispositivo".to_string(),
-            _ => format!("{n} dispositivos"),
+            0 => tr("Sin dispositivos todavía", "No devices yet").to_string(),
+            1 => tr("1 dispositivo", "1 device").to_string(),
+            _ => trf!("{n} dispositivos", "{n} devices"),
         };
         header(ui, &app.logo, "YesCharge", &sub);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if widgets::icon_button(ui, Glyph::Settings, "Ajustes").clicked() {
+            if widgets::icon_button(ui, Glyph::Settings, tr("Ajustes", "Settings")).clicked() {
                 next = Some(Page::Settings(Box::new(settings::Settings::new())));
             }
-            let clicked = widgets::icon_button(ui, Glyph::Refresh, "Actualizar ahora").clicked();
+            let clicked = widgets::icon_button(ui, Glyph::Refresh, tr("Actualizar ahora", "Refresh now")).clicked();
             // los clics seguidos se ignoran: no aportan nada y cada uno sería un ciclo completo
             if clicked && app.last_refresh.is_none_or(|t| t.elapsed() >= REFRESH_GAP) {
                 app.last_refresh = Some(Instant::now());
@@ -280,11 +283,21 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
         widgets::card(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("El servicio está detenido").font(theme::semibold(14.5)).color(WARN));
-                    widgets::muted(ui, "Sin él no se actualiza la batería ni llegan avisos.");
+                    ui.label(
+                        egui::RichText::new(tr("El servicio está detenido", "The service is stopped"))
+                            .font(theme::semibold(14.5))
+                            .color(WARN),
+                    );
+                    widgets::muted(
+                        ui,
+                        tr(
+                            "Sin él no se actualiza la batería ni llegan avisos.",
+                            "Without it the battery doesn't update and no alerts arrive.",
+                        ),
+                    );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if widgets::secondary_button(ui, "Iniciar", 90.0).clicked() {
+                    if widgets::secondary_button(ui, tr("Iniciar", "Start"), 90.0).clicked() {
                         ipc::spawn_self("--background");
                     }
                 });
@@ -314,16 +327,19 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
         let footer = if app.snapshot.updated_at > 0.0 {
             let now = yescharge_core::now_secs();
             let next_in = (app.snapshot.next_poll_at - now).max(0.0);
-            format!(
+            trf!(
                 "Actualizado {} · próxima consulta en {} min",
+                "Updated {} · next check in {} min",
                 ago(now - app.snapshot.updated_at),
                 (next_in / 60.0).ceil() as u64
             )
         } else {
-            "Esperando la primera lectura…".into()
+            tr("Esperando la primera lectura…", "Waiting for the first reading…").into()
         };
         widgets::muted(ui, footer);
-        if widgets::primary_button(ui, "+  Añadir dispositivo", ui.available_width(), true).clicked() {
+        if widgets::primary_button(ui, tr("+  Añadir dispositivo", "+  Add device"), ui.available_width(), true)
+            .clicked()
+        {
             next = Some(Page::Add(Box::new(wizard::Wizard::new())));
         }
     });
@@ -339,10 +355,21 @@ fn empty_state(ui: &mut egui::Ui) {
         p.circle_stroke(rect.center(), 54.0, Stroke::new(1.0, BORDER));
         widgets::bolt(p, rect.center(), 46.0, theme::alpha(BRAND_A, 0.9));
         ui.add_space(14.0);
-        ui.label(egui::RichText::new("Añade tu primer dispositivo").font(theme::semibold(18.0)));
+        ui.label(
+            egui::RichText::new(tr("Añade tu primer dispositivo", "Add your first device")).font(theme::semibold(18.0)),
+        );
         ui.add_space(2.0);
-        widgets::muted(ui, "Elige tu auricular, ratón, teclado o mando y YesCharge");
-        widgets::muted(ui, "probará cómo leer su batería de forma segura.");
+        widgets::muted(
+            ui,
+            tr(
+                "Elige tu auricular, ratón, teclado o mando y YesCharge",
+                "Pick your headset, mouse, keyboard or controller and YesCharge",
+            ),
+        );
+        widgets::muted(
+            ui,
+            tr("probará cómo leer su batería de forma segura.", "will test how to read its battery safely."),
+        );
     });
 }
 
@@ -391,13 +418,13 @@ fn device_card(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) -> egui::Response 
         p.text(
             pos2(chip.right() + 8.0, chip.center().y),
             Align2::LEFT_CENTER,
-            "aprox.",
+            tr("aprox.", "approx."),
             egui::FontId::proportional(11.5),
             FAINT,
         );
     }
-    let seen =
-        (d.last_seen > 0.0 && d.presence != Presence::Online).then(|| format!("visto {}", ago(now - d.last_seen)));
+    let seen = (d.last_seen > 0.0 && d.presence != Presence::Online)
+        .then(|| trf!("visto {}", "seen {}", ago(now - d.last_seen)));
     let line =
         [Some(d.eta.clone()).filter(|e| !e.is_empty()), seen].into_iter().flatten().collect::<Vec<_>>().join(" · ");
     p.text(pos2(x, rect.top() + 80.0), Align2::LEFT_CENTER, line, egui::FontId::proportional(12.5), MUTED);
@@ -425,6 +452,7 @@ fn device_card(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) -> egui::Response 
 pub fn save_config(cfg: &Config) -> bool {
     match cfg.save() {
         Ok(()) => {
+            yescharge_core::i18n::set(cfg.language);
             if !ipc::send(ipc::MSG_RELOAD) {
                 ipc::spawn_self("--background");
             }
@@ -441,7 +469,7 @@ pub fn save_config(cfg: &Config) -> bool {
 pub fn page_header(ui: &mut egui::Ui, title: &str) -> bool {
     let mut back = false;
     ui.horizontal(|ui| {
-        back = widgets::icon_button(ui, Glyph::Back, "Volver").clicked();
+        back = widgets::icon_button(ui, Glyph::Back, tr("Volver", "Back")).clicked();
         ui.label(egui::RichText::new(title).font(theme::bold(20.0)));
     });
     ui.add_space(4.0);
