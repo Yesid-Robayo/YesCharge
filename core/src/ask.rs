@@ -107,6 +107,8 @@ pub struct Query {
     /// VID:PID con que aparece por USB al conectarle el cable estando apagado. Verlo basta para
     /// saber que está cargando, sin enviarle nada.
     on_cable: &'static [(u16, u16)],
+    /// Por cable responde si está cargando o completo, aunque su porcentaje no sirva.
+    state_on_cable: bool,
     /// VID:PID del receptor cuando no hay nada al otro lado. Verlo basta para saber que el
     /// dispositivo está apagado, sin enviarle nada.
     receiver_alone: &'static [(u16, u16)],
@@ -216,6 +218,7 @@ pub static CATALOG: &[Query] = &[
         ],
         targets: &[target(0x1038, 0x2232, 0xffc0)],
         on_cable: &[],
+        state_on_cable: false,
         receiver_alone: &[],
         status: None,
         prepare: &[],
@@ -247,9 +250,10 @@ pub static CATALOG: &[Query] = &[
                 kind: EventKind::Battery { xor: 0xff },
             },
         ],
-        // por cable sigue dando el último porcentaje sin actualizarlo: no sirve como nivel actual
+        // por cable sigue dando el último porcentaje sin actualizarlo: solo vale su estado de carga
         targets: &[target(0x5253, 0x1020, 0xff01), target(0x3837, 0x4016, 0xff01)],
         on_cable: &[(0x3837, 0x4016)],
+        state_on_cable: true,
         receiver_alone: &[],
         status: None,
         prepare: &[],
@@ -264,6 +268,7 @@ pub static CATALOG: &[Query] = &[
         events: &[],
         targets: &[Target { vid: 0x3151, pid: 0x502b, usage_page: 0xffff, usage: Some(0x0002) }],
         on_cable: &[(0x3151, 0x5030)],
+        state_on_cable: false,
         receiver_alone: &[],
         status: Some(Status {
             steps: &[
@@ -294,6 +299,7 @@ pub static CATALOG: &[Query] = &[
         // inalámbrico es 1098; con cable, 100f; apagado solo queda el receptor, 2106
         targets: &[target(0x3537, 0x1098, 0xff7a), target(0x3537, 0x100f, 0xff7a)],
         on_cable: &[(0x3537, 0x100f)],
+        state_on_cable: false,
         receiver_alone: &[(0x3537, 0x2106)],
         status: None,
         prepare: &[],
@@ -605,6 +611,16 @@ fn is_connected(ids: &[(u16, u16)], all: &[HidInterface]) -> bool {
     ids.iter().any(|&(vid, pid)| all.iter().any(|i| i.vid == vid && i.pid == pid))
 }
 
+fn charging_on_cable() -> RawReading {
+    RawReading {
+        presence: Presence::Online,
+        charge: Charge::Charging,
+        no_percentage: true,
+        detail: "conectado por cable".into(),
+        ..Default::default()
+    }
+}
+
 /// Pregunta la batería a un dispositivo del catálogo. Si se preguntó hace menos de `every` (nunca
 /// menos de `MIN_GAP`), no envía nada y devuelve `Presence::Stale`.
 pub fn read(id: &str, every: Duration) -> RawReading {
@@ -612,22 +628,17 @@ pub fn read(id: &str, every: Duration) -> RawReading {
         return RawReading::absent(Presence::Error, "petición desconocida");
     };
     let all = hid::enumerate();
-    if is_connected(q.on_cable, &all) {
-        return RawReading {
-            presence: Presence::Online,
-            battery: None,
-            charge: Charge::Charging,
-            approximate: false,
-            no_percentage: true,
-            detail: "conectado por cable".into(),
-        };
+    let on_cable = is_connected(q.on_cable, &all);
+    if on_cable && !q.state_on_cable {
+        return charging_on_cable();
     }
     if asked_within(q, every.max(MIN_GAP)) {
         return RawReading::absent(Presence::Stale, "preguntado hace poco");
     }
     let (mut found, mut busy) = (false, false);
     let mut failure = None;
-    for t in q.targets {
+    // con el cable puesto, el receptor ya no tiene nada al otro lado
+    for t in q.targets.iter().filter(|t| !on_cable || q.on_cable.contains(&(t.vid, t.pid))) {
         let Some(info) = find_interface(t, &all) else { continue };
         found = true;
         let dev = match HidDevice::open_for_query(info) {
@@ -647,10 +658,10 @@ pub fn read(id: &str, every: Duration) -> RawReading {
             Some(Outcome::Data { battery, charge }) => {
                 return RawReading {
                     presence: Presence::Online,
-                    battery,
+                    battery: battery.filter(|_| !on_cable),
                     charge,
                     approximate: false,
-                    no_percentage: battery.is_none(),
+                    no_percentage: on_cable || battery.is_none(),
                     detail: format!("pregunta {}", q.id),
                 };
             }
@@ -659,6 +670,9 @@ pub fn read(id: &str, every: Duration) -> RawReading {
             Some(Outcome::NoResponse) => {}
             None => busy = true,
         }
+    }
+    if on_cable {
+        return charging_on_cable();
     }
     match failure {
         Some(HidError::Gone) => RawReading::absent(Presence::NotFound, "desconectado"),

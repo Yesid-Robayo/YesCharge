@@ -320,11 +320,16 @@ impl Monitor {
                         },
                     };
                 }
-                None if charge == Charge::Charging => {
+                None if matches!(charge, Charge::Charging | Charge::Full) => {
                     // p. ej. mando por cable: carga sin porcentaje
                     let battery = st.known.as_ref().and_then(|k| k.battery);
                     st.known = Some(KnownReading { battery, charge, at: now as u64 });
-                    ds.eta = tr("Cargando (sin porcentaje)", "Charging (no percentage)").into();
+                    apply_top_off(st, entry, cfg, now, charge, &mut ds, &mut events);
+                    ds.eta = if charge == Charge::Full {
+                        charge_eta(st, entry, now, &ds).unwrap_or_default()
+                    } else {
+                        tr("Cargando (sin porcentaje)", "Charging (no percentage)").into()
+                    };
                     ds.last_seen = now;
                 }
                 None => {
@@ -512,6 +517,21 @@ mod tests {
         // al volver a ser inalámbrico, el número es otra vez real
         let (snap, _) = m.cycle(&c, 0.0, false, 1120.0, &mut |_| online(80, Charge::Discharging));
         assert_eq!(snap.devices[0].battery, Some(80));
+    }
+
+    #[test]
+    fn a_device_without_percentage_still_says_when_it_finished() {
+        let mut c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        c.devices[0].top_off_minutes = 0;
+        let reading =
+            |charge| RawReading { presence: Presence::Online, charge, no_percentage: true, ..Default::default() };
+        let mut m = monitor();
+        let (snap, ev) = m.cycle(&c, 0.0, false, 1000.0, &mut |_| reading(Charge::Charging));
+        assert!(!snap.devices[0].full && ev.full.is_empty());
+        let (snap, ev) = m.cycle(&c, 0.0, false, 1300.0, &mut |_| reading(Charge::Full));
+        assert!(snap.devices[0].full, "debe decir cargado");
+        assert_eq!(ev.full.len(), 1, "debe avisar una vez");
+        assert_eq!(snap.devices[0].battery, None);
     }
 
     #[test]
