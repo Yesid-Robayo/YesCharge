@@ -50,7 +50,7 @@ YesCharge les pregunte. Esa opción viene apagada, es por dispositivo y hay que 
 - **Tu propio perfil escuchando**: para los dispositivos 2.4 GHz que Windows no conoce, YesCharge graba lo que el
   dispositivo envía mientras conectas y quitas el cable de carga, encuentra los bytes que cambian y le crea un perfil.
 - **Preguntar, solo si lo aceptas**: a los modelos compatibles que solo dicen su batería si se les pregunta se les puede
-  preguntar, tras un aviso de riesgo que debes aceptar. Mira la [lista de modelos](docs/fuentes-de-protocolos.md#modelos-del-catálogo).
+  preguntar, tras un aviso de riesgo que debes aceptar. Mira la [lista de modelos](docs/protocol-sources.md#modelos-del-catálogo).
 - **Envíanos tu dispositivo**: si no se puede leer el tuyo, el asistente guarda un informe que puedes adjuntar a un
   *issue* para añadir su modelo.
 - **Icono en la bandeja** con el nivel más bajo, y un rayo mientras algo carga.
@@ -182,7 +182,7 @@ avisar de un error) y `captures\` (informes de escucha).
 - `hid.dll` + SetupAPI de Windows para HID; CfgMgr32 para la batería Bluetooth; XInput para mandos.
 - Iconos dibujados por código (sin archivos de imagen): el icono del exe se genera al compilar.
 
-El diseño está explicado en [docs/arquitectura.md](docs/arquitectura.md).
+El diseño está explicado en [docs/architecture.md](docs/architecture.md).
 
 ## 💻 Desarrollo
 

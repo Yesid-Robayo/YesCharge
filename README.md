@@ -53,7 +53,7 @@ YesCharge ask. That option is off, it's per device, and you have to accept a ris
 - **Your own profile by listening**: for 2.4 GHz devices Windows doesn't know about, YesCharge records what the device
   sends while you plug and unplug the charging cable, finds the bytes that change and builds a profile for it.
 - **Asking, only if you accept**: supported models that only tell their battery when asked can be asked, after a risk
-  warning you must accept. See the [list of models](docs/fuentes-de-protocolos.md#modelos-del-catálogo).
+  warning you must accept. See the [list of models](docs/protocol-sources.md#models-in-the-catalog).
 - **Send us your device**: if yours can't be read, the wizard saves a report you can attach to an *issue* so its model
   can be added.
 - **Tray icon** that shows the lowest battery level, with a bolt while something is charging.
@@ -185,7 +185,7 @@ bug report) and `captures\` (listening reports).
 - Windows `hid.dll` + SetupAPI for HID; CfgMgr32 for the Bluetooth battery; XInput for controllers.
 - Icons drawn in code (no image files): the exe icon is generated at build time.
 
-The design is explained in [docs/arquitectura.md](docs/arquitectura.md) (Spanish).
+The design is explained in [docs/architecture.md](docs/architecture.md) (Spanish).
 
 ## 💻 Development
 

@@ -12,7 +12,7 @@ What does help a lot:
 - **Telling which devices work** (and with which method) or don't, in an *issue*.
 - **Sending us your device** with the "New device" template: its name, how it connects (2.4 GHz dongle, Bluetooth, cable)
   and the **report** the wizard saved for you (`%APPDATA%\YesCharge\captures\`). If it only tells its battery when asked,
-  [this guide](docs/capturar-peticiones.md) shows how to capture the request.
+  [this guide](docs/capturing-requests.md) shows how to capture the request.
 - **Reporting bugs** in an *issue* ("Bug" template): what happened, how to reproduce it, the version and your
   `yescharge.log` (`%APPDATA%\YesCharge\yescharge.log`).
 - **Suggesting ideas** in an *issue*.
@@ -30,7 +30,7 @@ Lo que sí ayuda mucho:
 - **Contar qué dispositivos funcionan** (y con qué método) o no, en un *issue*.
 - **Enviarnos tu dispositivo** con la plantilla "Dispositivo nuevo": su nombre, cómo se conecta (dongle 2.4 GHz,
   Bluetooth, cable) y el **informe** que te guardó el asistente (`%APPDATA%\YesCharge\captures\`). Si solo dice su batería
-  cuando se le pregunta, [esta guía](docs/capturar-peticiones.md) explica cómo capturar la petición.
+  cuando se le pregunta, [esta guía](docs/capturing-requests.md) explica cómo capturar la petición.
 - **Avisar de errores** en un *issue* (plantilla "Error"): qué pasó, cómo repetirlo, la versión y tu `yescharge.log`
   (`%APPDATA%\YesCharge\yescharge.log`).
 - **Proponer ideas** en un *issue*.
