@@ -218,7 +218,6 @@ opens a screen with sample data.
   [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
 - **YesCharge is an independent project**, not affiliated with or endorsed by SteelSeries, MCHOSE, CAROTMAS, GameSir or any
   other brand. Their names only say which devices it works with, and belong to their owners.
-- Inspired by **BatteryInfo**, the author's previous app, which only worked with his own devices.
 - **AI disclosure:** this app was developed with the help of AI tools.
 
 ---
