@@ -116,6 +116,8 @@ impl eframe::App for Panel {
             .show(ui, |ui| {
                 let rows = ROW * self.devices.len().min(MAX_ROWS) as f32;
                 egui::ScrollArea::vertical().max_height(rows).auto_shrink([false, true]).show(ui, |ui| {
+                    // la altura de la ventana se calcula con filas pegadas
+                    ui.spacing_mut().item_spacing.y = 0.0;
                     for d in &self.devices {
                         row(ui, d);
                     }
