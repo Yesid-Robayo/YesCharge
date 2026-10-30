@@ -4,7 +4,8 @@
 
 ## English
 
-Thanks for your interest. YesCharge is developed by a single person and **does not accept *pull requests***.
+Thanks for your interest. YesCharge is developed by a single person and **does not accept *pull requests***: they are
+closed automatically when opened.
 
 What does help a lot:
 
@@ -21,7 +22,8 @@ The code is [MIT](LICENSE) licensed: you can make your own copy and modify it un
 
 ## Español
 
-Gracias por el interés. YesCharge lo desarrolla una sola persona y **no acepta *pull requests***.
+Gracias por el interés. YesCharge lo desarrolla una sola persona y **no acepta *pull requests***: se cierran
+automáticamente al abrirlos.
 
 Lo que sí ayuda mucho:
 

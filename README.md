@@ -138,7 +138,9 @@ If you try it with your device, an *issue* saying whether it worked (and which m
    ```powershell
    Get-FileHash .\YesCharge.exe -Algorithm SHA256
    ```
-   It must match the `SHA256SUMS.txt` of the release.
+   It must match the `SHA256SUMS.txt` of the release. Every release is built by GitHub Actions from this repository's
+   code and carries a [provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)
+   that you can verify with `gh attestation verify YesCharge.exe --repo Yesid-Robayo/YesCharge`.
 3. Put it in a folder of your choice and open it. There is no installer.
 
 > [!NOTE]
@@ -229,6 +231,6 @@ opens a screen with sample data.
   it **at your own risk**.
 - It's a personal project, made for its author's own use and shared in case it's useful to someone else: there's no
   support commitment, and *issues* get an answer when there's time.
-- **Pull requests are not accepted.** Bugs, ideas and support requests for new devices
+- **Pull requests are not accepted** (they are closed automatically). Bugs, ideas and support requests for new devices
   go in an *issue*; see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Security problems are reported privately: [SECURITY.md](SECURITY.md).

@@ -47,14 +47,14 @@ Only the latest version published in *Releases* receives fixes.
 - **Listening reports** stay on your PC (the last 10, in `%APPDATA%\YesCharge\captures`) and only leave it if you attach
   one to an *issue*. They contain the device's name, its VID:PID and the bytes it sent on its manufacturer interfaces.
   Look at them before sharing them.
-- **Releases are built by the author** from this repository's code, with a published SHA256. Dependencies are locked in
-  `Cargo.lock` with their checksums.
+- **Releases are built by GitHub Actions** from this repository's code, with a published SHA256 and a provenance
+  attestation you can verify (see the README). Dependencies are locked in `Cargo.lock` with their checksums.
 
 ### What it does not protect
 
 - Sending anything to a device is never 100 % safe. Each request in the list was checked on a single unit of that model:
   a different firmware could behave differently. If you want no risk at all, don't turn asking on.
-- The exe isn't signed with a paid certificate: check the SHA256 before running it, or build it yourself from the code.
+- The exe isn't signed with a paid certificate: check the SHA256 or the attestation before running it.
 - Any program running as your user can read the files in `%APPDATA%\YesCharge` (battery levels and device names) and,
   if you turn it on, the local API.
 
@@ -102,14 +102,14 @@ Solo la última versión publicada en *Releases* recibe arreglos.
 - **Los informes de escucha** se quedan en tu PC (los 10 últimos, en `%APPDATA%\YesCharge\captures`) y solo salen de
   él si adjuntas uno a un *issue*. Contienen el nombre del dispositivo, su VID:PID y los bytes que envió por sus
   interfaces del fabricante. Revísalos antes de compartirlos.
-- **Las releases las compila el autor** con el código de este repositorio, con su SHA256 publicado. Las dependencias
-  están fijadas en `Cargo.lock` con sus sumas de comprobación.
+- **Las releases las compila GitHub Actions** con el código de este repositorio, con su SHA256 publicado y una
+  atestación de origen que puedes verificar (mira el README). Las dependencias están fijadas en `Cargo.lock` con sus
+  sumas de comprobación.
 
 ### Lo que no protege
 
 - Enviarle algo a un dispositivo nunca es 100 % seguro. Cada petición de la lista se comprobó en una sola unidad de ese
   modelo: con otro firmware podría comportarse distinto. Si no quieres ningún riesgo, no actives preguntar.
-- El exe no está firmado con un certificado de pago: comprueba el SHA256 antes de ejecutarlo, o compílalo tú desde el
-  código.
+- El exe no está firmado con un certificado de pago: comprueba el SHA256 o la atestación antes de ejecutarlo.
 - Cualquier programa que corra con tu usuario puede leer los archivos de `%APPDATA%\YesCharge` (niveles de batería y
   nombres de dispositivos) y, si la activas, la API local.
