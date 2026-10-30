@@ -267,7 +267,7 @@ pub fn status_of(d: &DeviceStatus) -> (&'static str, Color32) {
 }
 
 pub fn ring_color(d: &DeviceStatus) -> Color32 {
-    if d.presence == Presence::Off {
+    if matches!(d.presence, Presence::Off | Presence::Asleep | Presence::NotFound) {
         FAINT
     } else if d.topping_off || d.charge == Charge::Charging {
         CHARGE
