@@ -353,7 +353,7 @@ pub fn event_profile(q: &Query) -> Option<ListenProfile> {
             },
         })
         .collect();
-    (!signals.is_empty()).then_some(ListenProfile { vid: target.vid, pid: target.pid, signals })
+    (!signals.is_empty()).then_some(ListenProfile { vid: target.vid, pid: target.pid, signals, container: None })
 }
 
 /// Operaciones con el dispositivo. La implementa `Device` y el simulado de las pruebas.
@@ -560,20 +560,25 @@ impl Link for Device<'_> {
     }
 }
 
-fn last_asked() -> &'static Mutex<HashMap<&'static str, Instant>> {
-    static MAP: OnceLock<Mutex<HashMap<&'static str, Instant>>> = OnceLock::new();
+fn last_asked() -> &'static Mutex<HashMap<String, Instant>> {
+    static MAP: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
     MAP.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Segundos que faltan para poder volver a preguntar, redondeados hacia arriba.
-pub fn wait_secs(q: &Query) -> u64 {
-    let map = last_asked().lock().unwrap_or_else(|e| e.into_inner());
-    map.get(q.id).map_or(0, |t| MIN_GAP.saturating_sub(t.elapsed()).as_secs_f64().ceil() as u64)
+/// El límite de `MIN_GAP` es por aparato, no por modelo.
+fn asked_key(q: &Query, container: Option<&str>) -> String {
+    format!("{}/{}", q.id, container.unwrap_or(""))
 }
 
-fn asked_within(q: &Query, gap: Duration) -> bool {
+/// Segundos que faltan para poder volver a preguntar, redondeados hacia arriba.
+pub fn wait_secs(q: &Query, container: Option<&str>) -> u64 {
     let map = last_asked().lock().unwrap_or_else(|e| e.into_inner());
-    map.get(q.id).is_some_and(|t| t.elapsed() < gap)
+    map.get(&asked_key(q, container)).map_or(0, |t| MIN_GAP.saturating_sub(t.elapsed()).as_secs_f64().ceil() as u64)
+}
+
+fn asked_within(q: &Query, container: Option<&str>, gap: Duration) -> bool {
+    let map = last_asked().lock().unwrap_or_else(|e| e.into_inner());
+    map.get(&asked_key(q, container)).is_some_and(|t| t.elapsed() < gap)
 }
 
 /// Evita que dos procesos de YesCharge mezclen sus conversaciones con un dispositivo.
@@ -597,14 +602,15 @@ fn with_lock<T>(f: impl FnOnce() -> T) -> Option<T> {
     }
 }
 
-fn find_interface<'a>(t: &Target, all: &'a [HidInterface]) -> Option<&'a HidInterface> {
-    all.iter().find(|i| {
+fn find_interface<'a>(t: &Target, all: &'a [HidInterface], container: Option<&str>) -> Option<&'a HidInterface> {
+    let found = all.iter().filter(|i| {
         i.vid == t.vid
             && i.pid == t.pid
             && i.usage_page == t.usage_page
             && t.usage.is_none_or(|u| u == i.usage)
             && i.is_vendor_defined()
-    })
+    });
+    hid::pick(found, container)
 }
 
 fn is_connected(ids: &[(u16, u16)], all: &[HidInterface]) -> bool {
@@ -625,7 +631,7 @@ fn charging_on_cable() -> RawReading {
 /// Pregunta la batería a un dispositivo del catálogo. Si se preguntó hace menos de `every` (nunca
 /// menos de `MIN_GAP`), no envía nada y devuelve `Presence::Stale`. Con `None` tampoco envía nada:
 /// solo mira lo que se distingue por los dispositivos que ve Windows.
-pub fn read(id: &str, every: Option<Duration>) -> RawReading {
+pub fn read(id: &str, container: Option<&str>, every: Option<Duration>) -> RawReading {
     let Some(q) = find(id) else {
         return RawReading::absent(Presence::Error, "petición desconocida");
     };
@@ -635,21 +641,21 @@ pub fn read(id: &str, every: Option<Duration>) -> RawReading {
         return charging_on_cable();
     }
     let Some(every) = every else {
-        let linked = q.targets.iter().any(|t| find_interface(t, &all).is_some());
+        let linked = q.targets.iter().any(|t| find_interface(t, &all, container).is_some());
         return if !linked && is_connected(q.receiver_alone, &all) {
             RawReading { heard_only: true, ..RawReading::absent(Presence::Off, "apagado") }
         } else {
             RawReading::absent(Presence::Stale, "sin preguntar")
         };
     };
-    if asked_within(q, every.max(MIN_GAP)) {
+    if asked_within(q, container, every.max(MIN_GAP)) {
         return RawReading::absent(Presence::Stale, "preguntado hace poco");
     }
     let (mut found, mut busy) = (false, false);
     let mut failure = None;
     // con el cable puesto, el receptor ya no tiene nada al otro lado
     for t in q.targets.iter().filter(|t| !on_cable || q.on_cable.contains(&(t.vid, t.pid))) {
-        let Some(info) = find_interface(t, &all) else { continue };
+        let Some(info) = find_interface(t, &all, container) else { continue };
         found = true;
         let dev = match HidDevice::open_for_query(info) {
             Ok(d) => d,
@@ -662,7 +668,7 @@ pub fn read(id: &str, every: Option<Duration>) -> RawReading {
                 continue;
             }
         };
-        last_asked().lock().unwrap_or_else(|e| e.into_inner()).insert(q.id, Instant::now());
+        last_asked().lock().unwrap_or_else(|e| e.into_inner()).insert(asked_key(q, container), Instant::now());
         let outcome = with_lock(|| execute(q, &mut Device { dev: &dev, sends: 0, reads: 0 }));
         match outcome {
             Some(Outcome::Data { battery, charge }) => {
@@ -826,9 +832,19 @@ mod tests {
 
     #[test]
     fn an_added_model_is_known_by_all_its_usb_ids() {
-        let source = crate::config::Source::Ask { query: "carotmas-mars68".into(), accepted_at: 1, notices: None };
+        let source = crate::config::Source::Ask {
+            query: "carotmas-mars68".into(),
+            accepted_at: 1,
+            notices: None,
+            container: None,
+        };
         assert_eq!(source.device_keys(), ["usb:3151:502b", "usb:3151:5030"]);
-        let source = crate::config::Source::Ask { query: "gamesir-nova-2-lite".into(), accepted_at: 1, notices: None };
+        let source = crate::config::Source::Ask {
+            query: "gamesir-nova-2-lite".into(),
+            accepted_at: 1,
+            notices: None,
+            container: None,
+        };
         assert_eq!(source.device_keys(), ["usb:3537:1098", "usb:3537:100f", "usb:3537:100f", "usb:3537:2106"]);
     }
 

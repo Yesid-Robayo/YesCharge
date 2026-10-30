@@ -41,6 +41,9 @@ pub fn service_running() -> bool {
 
 /// Arranca otra instancia del exe con `arg` (`--window` o `--background`).
 pub fn spawn_self(arg: &str) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{ASFW_ANY, AllowSetForegroundWindow};
+    // la bandeja le cede el primer plano: sin esto, la ventana nueva se abriría detrás de otras
+    unsafe { AllowSetForegroundWindow(ASFW_ANY) };
     if let Ok(exe) = std::env::current_exe()
         && let Err(e) = std::process::Command::new(exe).arg(arg).spawn()
     {

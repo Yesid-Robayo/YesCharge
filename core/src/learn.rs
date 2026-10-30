@@ -497,7 +497,7 @@ pub fn build_profile(
         signals.push(signal(p, SignalKind::Power { off: p.values[0].clone() })?);
     }
     let first = ifaces.first()?;
-    (!signals.is_empty()).then_some(ListenProfile { vid: first.vid, pid: first.pid, signals })
+    (!signals.is_empty()).then_some(ListenProfile { vid: first.vid, pid: first.pid, signals, container: None })
 }
 
 impl Listener {

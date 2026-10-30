@@ -31,6 +31,8 @@ pub struct Candidate {
     pub transport: Transport,
     pub kind: DeviceKind,
     pub vid_pid: Option<(u16, u16)>,
+    /// Qué aparato físico es: dos iguales comparten VID:PID.
+    pub container: Option<String>,
     pub interfaces: Vec<HidInterface>,
     pub bt_instance: Option<String>,
     pub xinput_slot: Option<u8>,
@@ -82,6 +84,21 @@ pub fn usb_key(vid: u16, pid: u16) -> String {
     format!("usb:{vid:04x}:{pid:04x}")
 }
 
+/// Separa por aparato físico las interfaces de un mismo VID:PID. Devuelve el contenedor, un número
+/// para distinguirlos si hay varios iguales, y sus interfaces. Si Windows no da el contenedor de
+/// alguna, se deja todo junto: mejor un aparato de más que partir uno en dos.
+fn units(ifaces: Vec<HidInterface>) -> Vec<(Option<String>, Option<usize>, Vec<HidInterface>)> {
+    let mut by_unit: BTreeMap<Option<String>, Vec<HidInterface>> = BTreeMap::new();
+    for i in ifaces {
+        by_unit.entry(i.container()).or_default().push(i);
+    }
+    if by_unit.contains_key(&None) {
+        return vec![(None, None, by_unit.into_values().flatten().collect())];
+    }
+    let several = by_unit.len() > 1;
+    by_unit.into_iter().enumerate().map(|(n, (c, list))| (c, several.then_some(n + 1), list)).collect()
+}
+
 /// Todo lo conectado que podría tener batería, con lo más prometedor primero.
 pub fn candidates() -> Vec<Candidate> {
     let mut out = Vec::new();
@@ -93,7 +110,10 @@ pub fn candidates() -> Vec<Candidate> {
             groups.entry((i.vid, i.pid)).or_default().push(i);
         }
     }
-    for ((vid, pid), ifaces) in groups {
+    for ((vid, pid), ifaces) in
+        groups.into_iter().flat_map(|(id, ifaces)| units(ifaces).into_iter().map(move |u| (id, u)))
+    {
+        let (container, number, ifaces) = ifaces;
         let standard = ifaces.iter().any(crate::sources::declares_standard_battery);
         let listenable = ifaces.iter().any(|i| i.is_vendor_defined() && i.input_len > 0);
         let product = ifaces.iter().map(|i| i.product.as_str()).find(|s| !s.is_empty()).unwrap_or("");
@@ -103,6 +123,7 @@ pub fn candidates() -> Vec<Candidate> {
         } else {
             product.to_string()
         };
+        let title = number.map_or(title.clone(), |n| format!("{title} ({n})"));
         let subtitle = if maker.is_empty() {
             format!("USB / 2.4 GHz · {vid:04x}:{pid:04x}")
         } else {
@@ -115,6 +136,7 @@ pub fn candidates() -> Vec<Candidate> {
             subtitle,
             transport: Transport::Usb,
             vid_pid: Some((vid, pid)),
+            container,
             interfaces: ifaces,
             bt_instance: None,
             xinput_slot: None,
@@ -131,6 +153,7 @@ pub fn candidates() -> Vec<Candidate> {
             subtitle: trf!("Bluetooth · Windows informa {} %", "Bluetooth · Windows reports {} %", bt.battery),
             transport: Transport::Bluetooth,
             vid_pid: None,
+            container: None,
             interfaces: Vec::new(),
             bt_instance: Some(bt.instance_id),
             xinput_slot: None,
@@ -151,6 +174,7 @@ pub fn candidates() -> Vec<Candidate> {
             .into(),
             transport: Transport::Xinput,
             vid_pid: None,
+            container: None,
             interfaces: Vec::new(),
             bt_instance: None,
             xinput_slot: Some(slot),
@@ -290,7 +314,13 @@ pub fn probe(c: &Candidate, report: &mut dyn FnMut(ProbeStep)) -> Option<ProbeRe
                 ),
             ));
             return Some(ProbeResult {
-                source: Source::HidStandard { vid: i.vid, pid: i.pid, usage_page: i.usage_page, usage: i.usage },
+                source: Source::HidStandard {
+                    vid: i.vid,
+                    pid: i.pid,
+                    usage_page: i.usage_page,
+                    usage: i.usage,
+                    container: c.container.clone(),
+                },
                 reading: r,
                 method: tr("HID estándar", "Standard HID").into(),
             });

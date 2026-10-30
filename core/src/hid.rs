@@ -54,6 +54,23 @@ impl HidInterface {
     pub fn is_vendor_defined(&self) -> bool {
         self.usage_page >= 0xFF00
     }
+
+    /// De qué aparato físico es esta interfaz: dos aparatos iguales comparten todo lo demás.
+    pub fn container(&self) -> Option<String> {
+        crate::sources::container_id(&self.path)
+    }
+}
+
+/// Elige entre interfaces equivalentes la del aparato `container`. Si ese aparato no aparece y solo
+/// hay uno de ese modelo, es ese: conectarlo por cable o en otro puerto puede cambiar su identidad.
+pub fn pick<'a>(found: impl Iterator<Item = &'a HidInterface>, container: Option<&str>) -> Option<&'a HidInterface> {
+    let found: Vec<&HidInterface> = found.collect();
+    let Some(wanted) = container else { return found.first().copied() };
+    found.iter().find(|i| i.container().as_deref() == Some(wanted)).copied().or(if found.len() == 1 {
+        found.first().copied()
+    } else {
+        None
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,5 +302,40 @@ impl Drop for HidDevice {
             CloseHandle(self.handle);
             CloseHandle(self.event);
         }
+    }
+}
+
+#[cfg(test)]
+mod pick_tests {
+    use super::*;
+
+    fn iface() -> HidInterface {
+        HidInterface {
+            path: String::new(),
+            vid: 1,
+            pid: 2,
+            version: 0,
+            usage_page: 0xff00,
+            usage: 1,
+            input_len: 0,
+            output_len: 0,
+            feature_len: 0,
+            product: String::new(),
+            manufacturer: String::new(),
+        }
+    }
+
+    #[test]
+    fn with_one_unit_of_a_model_it_is_that_one_even_if_its_identity_changed() {
+        let one = [iface()];
+        assert!(pick(one.iter(), None).is_some());
+        assert!(pick(one.iter(), Some("otro")).is_some());
+    }
+
+    #[test]
+    fn with_two_units_it_never_guesses_which_one() {
+        let two = [iface(), iface()];
+        assert!(pick(two.iter(), Some("otro")).is_none());
+        assert!(pick(two.iter(), None).is_some(), "sin contenedor guardado sigue funcionando como antes");
     }
 }

@@ -1,6 +1,7 @@
 //! Ventana de YesCharge (proceso aparte del servicio: solo existe mientras está abierta).
 
 mod detail;
+pub mod panel;
 mod settings;
 mod theme;
 mod widgets;

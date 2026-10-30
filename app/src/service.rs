@@ -161,7 +161,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         MSG_TRAY => {
             let event = (lparam as u32) & 0xffff;
             match event {
-                NIN_SELECT | NIN_KEYSELECT | WM_LBUTTONUP => ipc::spawn_self("--window"),
+                NIN_SELECT | NIN_KEYSELECT | WM_LBUTTONUP => ipc::spawn_self("--panel"),
                 WM_CONTEXTMENU | WM_RBUTTONUP => {
                     let lines =
                         with_service(|s| menu_lines(&s.shared.lock().map(|g| g.snapshot.clone()).unwrap_or_default()))

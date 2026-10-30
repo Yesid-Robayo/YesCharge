@@ -22,6 +22,8 @@ fn main() {
     let has = |flag: &str| args.iter().any(|a| a == flag);
     if has("--window") {
         ui::run();
+    } else if has("--panel") {
+        ui::panel::run();
     } else {
         service::run(!has("--background"));
     }

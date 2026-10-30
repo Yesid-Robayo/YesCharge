@@ -52,6 +52,8 @@ struct AskTest {
     answers: [Option<RawReading>; 5],
     /// Si el usuario sale de la prueba, la pregunta que estaba esperando ya no se envía.
     cancelled: Arc<AtomicBool>,
+    /// Qué aparato físico se está probando.
+    unit: Option<String>,
 }
 
 impl Drop for AskTest {
@@ -64,7 +66,7 @@ impl AskTest {
     fn begin_phase(&mut self, phase: u8) {
         let settle = ASK_SETTLE_SECS[phase as usize];
         if settle > 0 {
-            self.pending = Some(ask_later(self.query, settle, self.cancelled.clone()));
+            self.pending = Some(ask_later(self.query, self.unit.clone(), settle, self.cancelled.clone()));
         }
     }
 
@@ -173,10 +175,16 @@ pub struct Wizard {
 fn scan() -> Receiver<Vec<Candidate>> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        // lo que ya está añadido no se vuelve a ofrecer
-        let added: Vec<String> = Config::load().devices.iter().flat_map(|d| d.source.device_keys()).collect();
+        // lo que ya está añadido no se vuelve a ofrecer, pero sí otro aparato igual
+        let added = Config::load().devices;
         let mut items = probe::candidates();
-        items.retain(|c| !added.contains(&c.key));
+        items.retain(|c| {
+            !added.iter().any(|d| {
+                let unit = d.source.container();
+                d.source.device_keys().contains(&c.key)
+                    && (unit.is_none() || c.container.is_none() || unit == c.container.as_deref())
+            })
+        });
         let _ = tx.send(items);
     });
     rx
@@ -211,6 +219,7 @@ impl Wizard {
             transport: Transport::Usb,
             kind: DeviceKind::Headset,
             vid_pid: Some((0x1234, 0x5678)),
+            container: None,
             interfaces: Vec::new(),
             bt_instance: None,
             xinput_slot: None,
@@ -493,7 +502,7 @@ impl Wizard {
                     );
                     widgets::muted(ui, *text);
                 });
-                let wait = ask::wait_secs(query);
+                let wait = ask::wait_secs(query, cand.container.as_deref());
                 let label = if wait > 0 {
                     trf!("Reintentar en {wait} s", "Retry in {wait} s")
                 } else {
@@ -946,22 +955,28 @@ fn consent(ui: &mut egui::Ui, cand: &Candidate, query: &Query, accepted: &mut bo
 fn start_asking(cand: Candidate, query: &'static Query) -> Stage {
     yescharge_core::log::info(&format!("el usuario aceptó preguntarle a {}", query.id));
     let (tx, rx) = mpsc::channel();
+    let unit = cand.container.clone();
     std::thread::spawn(move || {
         // si se le acaba de preguntar, espera su turno en vez de darlo por fallido
-        std::thread::sleep(std::time::Duration::from_secs(ask::wait_secs(query)));
-        let _ = tx.send(ask::read(query.id, Some(ask::MIN_GAP)));
+        std::thread::sleep(std::time::Duration::from_secs(ask::wait_secs(query, unit.as_deref())));
+        let _ = tx.send(ask::read(query.id, unit.as_deref(), Some(ask::MIN_GAP)));
     });
     Stage::Asking { cand, query, rx }
 }
 
 /// Pregunta cuando el usuario ya tuvo tiempo de hacer lo que pide la fase y le toca el turno.
-fn ask_later(query: &'static Query, settle: u64, cancelled: Arc<AtomicBool>) -> Receiver<RawReading> {
+fn ask_later(
+    query: &'static Query,
+    unit: Option<String>,
+    settle: u64,
+    cancelled: Arc<AtomicBool>,
+) -> Receiver<RawReading> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(settle));
-        std::thread::sleep(Duration::from_secs(ask::wait_secs(query)));
+        std::thread::sleep(Duration::from_secs(ask::wait_secs(query, unit.as_deref())));
         if !cancelled.load(Ordering::Relaxed) {
-            let _ = tx.send(ask::read(query.id, Some(ask::MIN_GAP)));
+            let _ = tx.send(ask::read(query.id, unit.as_deref(), Some(ask::MIN_GAP)));
         }
     });
     rx
@@ -979,7 +994,12 @@ fn ask_finished(cand: Candidate, test: AskTest, capture: &Capture, ifaces: &[Hid
         test.query.id,
         notices.is_some()
     ));
-    let source = Source::Ask { query: test.query.id.into(), accepted_at: yescharge_core::now_secs() as u64, notices };
+    let source = Source::Ask {
+        query: test.query.id.into(),
+        accepted_at: yescharge_core::now_secs() as u64,
+        notices,
+        container: test.unit.clone(),
+    };
     let reading = test.first.clone();
     let result = ProbeResult { source, reading, method: tr("Preguntándoselo", "Asking it").into() };
     Stage::AskResult { cand, result: Some(result), charging, power: off }
@@ -1036,6 +1056,7 @@ fn asked(cand: Candidate, query: &'static Query, reading: RawReading) -> Stage {
                 pending: None,
                 answers: Default::default(),
                 cancelled: Arc::new(AtomicBool::new(false)),
+                unit: cand.container.clone(),
             };
             return start_test(cand, Some(test));
         }
@@ -1143,7 +1164,7 @@ fn listening(
             ui.add_space(4.0);
             if let Some(test) = ask.as_ref() {
                 let msg = match (&test.pending, &test.answers[*phase as usize]) {
-                    (Some(_), _) => match ask::wait_secs(test.query) {
+                    (Some(_), _) => match ask::wait_secs(test.query, test.unit.as_deref()) {
                         0 => tr("Preguntándole…", "Asking…").to_string(),
                         s => trf!("Le preguntará en {s} s", "It will ask in {s} s"),
                     },
@@ -1358,7 +1379,8 @@ fn review(
     let option = battery.and_then(|i| options.get(i));
     let batteries: Vec<_> =
         option.map(|o| o.members.iter().filter_map(|&i| capture.findings.get(i)).collect()).unwrap_or_default();
-    let profile = yescharge_core::learn::build_profile(ifaces, c, &batteries, pw);
+    let profile = yescharge_core::learn::build_profile(ifaces, c, &batteries, pw)
+        .map(|p| yescharge_core::listen::ListenProfile { container: cand.container.clone(), ..p });
     if widgets::primary_button(ui, tr("Crear mi perfil", "Create my profile"), ui.available_width(), profile.is_some())
         .clicked()
         && let Some(profile) = profile
@@ -1577,6 +1599,7 @@ fn confirm_view(ui: &mut egui::Ui, c: &mut Confirm) -> ConfirmOut {
                 top_off_minutes: 30,
                 enabled: true,
                 // el servicio empieza a escuchar de cero: que arranque con lo que ya se vio aquí
+                muted: false,
                 initial: matches!(c.source, Source::Listen { .. }).then(|| KnownReading {
                     battery: c.reading.battery,
                     charge: c.reading.charge,

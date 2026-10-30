@@ -36,6 +36,10 @@ dispositivo.
 - **Lista ordenada a tu gusto**: los encendidos primero, o el orden fijo que elijas arrastrando cada dispositivo.
 - **Botón Actualizar**: la lista muestra "Actualizando…" y vuelve con los datos nuevos, para que se note que hizo algo.
 - **Español e inglés**: empieza en español y se cambia en los ajustes.
+- **Panel rápido**: clic izquierdo en el icono de la bandeja para ver los niveles sin abrir la ventana.
+- **Dos dispositivos iguales** se distinguen y salen numerados al añadirlos.
+- **Silenciar los avisos** de cada dispositivo en sus detalles.
+- **Sin números viejos**: si algo se carga sin dar su porcentaje, se muestra "—" hasta tener una lectura real.
 - **Buscar actualización** y **Desinstalar** en los ajustes, conservando o borrando tus datos.
 - **API local opcional** en `127.0.0.1` (desactivada por defecto), con `/v1/status` y el formato compacto `/min`.
 
@@ -70,5 +74,5 @@ dispositivo.
 - Los modelos que no avisan por su cuenta (Mars68 y GameSir) tardan hasta un minuto en mostrar un cambio.
 - Jugar solo con un mando cuenta como PC inactivo para Windows, así que mientras tanto la app no pregunta.
 - El aviso de carga terminada todavía no se ha probado con una carga completa real.
-- Dos dispositivos idénticos no se distinguen: Windows les da el mismo identificador y la app solo ve uno.
+- Con dos dispositivos idénticos que se detectan por su identificador USB, conectar uno puede marcar los dos como cargando.
 - El exe no está firmado, así que Windows SmartScreen puede avisarte la primera vez.

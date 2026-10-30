@@ -36,6 +36,10 @@ First version. It's a personal project in beta: **you use it at your own risk**,
 - **A list ordered your way**: what's on first, or the fixed order you choose by dragging each device.
 - **Refresh button**: the list shows "Updating…" and comes back with the new data, so you can tell it did something.
 - **Spanish and English**: it starts in Spanish and you can change it in the settings.
+- **Quick panel**: left click the tray icon to see the levels without opening the window.
+- **Two identical devices** can be told apart and show up numbered when adding them.
+- **Mute the alerts** of each device in its details.
+- **No old numbers**: if something charges without giving its percentage, "—" shows until there's a real reading.
 - **Check for updates** and **Uninstall** in the settings, keeping or deleting your data.
 - **Optional local API** on `127.0.0.1` (off by default), with `/v1/status` and the compact `/min` format.
 
@@ -70,5 +74,5 @@ First version. It's a personal project in beta: **you use it at your own risk**,
 - Models that give no notice of their own (Mars68 and GameSir) take up to a minute to show a change.
 - Playing only with a controller counts as an idle PC for Windows, so while you do that the app doesn't ask.
 - The fully charged alert hasn't been tried with a real full charge yet.
-- Two identical devices can't be told apart: Windows gives them the same id and the app only sees one.
+- With two identical devices detected by their USB id, plugging one in can show both as charging.
 - The exe isn't signed, so Windows SmartScreen may warn you the first time.

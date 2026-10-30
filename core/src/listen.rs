@@ -82,6 +82,9 @@ pub struct ListenProfile {
     pub vid: u16,
     pub pid: u16,
     pub signals: Vec<Signal>,
+    /// Qué aparato físico es, por si hay otro igual (`hid::pick`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container: Option<String>,
 }
 
 /// Un mensaje cuenta como reciente este tiempo; después se muestra como "último dato".
@@ -237,9 +240,9 @@ impl Hub {
         let mut busy = None;
         let wanted: BTreeSet<(u16, u16)> = p.signals.iter().map(|s| (s.usage_page, s.usage)).collect();
         for (page, usage) in wanted {
-            let Some(info) =
-                all.iter().find(|i| i.vid == p.vid && i.pid == p.pid && i.usage_page == page && i.usage == usage)
-            else {
+            let found =
+                all.iter().filter(|i| i.vid == p.vid && i.pid == p.pid && i.usage_page == page && i.usage == usage);
+            let Some(info) = crate::hid::pick(found, p.container.as_deref()) else {
                 continue;
             };
             let dev = match HidDevice::open(info) {

@@ -16,7 +16,15 @@ pub enum Source {
     /// Mando XInput en una ranura (0-3).
     Xinput { slot: u8 },
     /// Batería HID estándar declarada por el propio dispositivo.
-    HidStandard { vid: u16, pid: u16, usage_page: u16, usage: u16 },
+    HidStandard {
+        vid: u16,
+        pid: u16,
+        usage_page: u16,
+        usage: u16,
+        /// Qué aparato físico es, por si hay otro igual (`hid::pick`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
+    },
     /// Perfil de escucha creado por el usuario (nunca envía nada).
     Listen { profile: crate::listen::ListenProfile },
     /// Pregunta comprobada del catálogo (`ask`). Es lo único que envía datos: existe solo si el
@@ -27,6 +35,9 @@ pub enum Source {
         /// Avisos que aprendió la prueba del asistente: dan el cable y el apagado sin preguntarle.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         notices: Option<crate::listen::ListenProfile>,
+        /// Qué aparato físico es, por si hay otro igual (`hid::pick`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
     },
 }
 
@@ -65,19 +76,29 @@ impl Source {
         }
     }
 
+    /// Qué aparato físico es, si se sabe.
+    pub fn container(&self) -> Option<&str> {
+        match self {
+            Source::HidStandard { container, .. } | Source::Ask { container, .. } => container.as_deref(),
+            Source::Listen { profile } => profile.container.as_deref(),
+            _ => None,
+        }
+    }
+
     /// Perfil que hay que mantener escuchando para esta fuente, si lo hay.
     pub fn listens_to(&self) -> Option<crate::listen::ListenProfile> {
         match self {
             Source::Listen { profile } => Some(profile.clone()),
-            Source::Ask { query, notices, .. } => {
+            Source::Ask { query, notices, container, .. } => {
                 let known = crate::ask::find(query).and_then(crate::ask::event_profile);
-                match (known, notices) {
+                let profile = match (known, notices) {
                     (Some(mut k), Some(n)) => {
                         k.signals.extend(n.signals.iter().cloned());
                         Some(k)
                     }
                     (k, n) => k.or_else(|| n.clone()),
-                }
+                };
+                profile.map(|p| crate::listen::ListenProfile { container: container.clone(), ..p })
             }
             _ => None,
         }
@@ -109,6 +130,8 @@ pub struct DeviceEntry {
     pub enabled: bool,
     /// Lo que vio el asistente al crear un perfil de escucha, para no empezar en blanco.
     pub initial: Option<KnownReading>,
+    /// No avisar de batería baja ni de carga completa.
+    pub muted: bool,
 }
 
 impl Default for DeviceEntry {
@@ -122,6 +145,7 @@ impl Default for DeviceEntry {
             top_off_minutes: 30,
             enabled: true,
             initial: None,
+            muted: false,
         }
     }
 }

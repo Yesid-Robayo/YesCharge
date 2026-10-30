@@ -17,6 +17,7 @@ pub struct Detail {
     threshold: u8,
     top_off: u32,
     enabled: bool,
+    muted: bool,
     source: String,
     asks: bool,
     confirm_remove: bool,
@@ -34,6 +35,7 @@ impl Detail {
             threshold: e.low_threshold,
             top_off: e.top_off_minutes,
             enabled: e.enabled,
+            muted: e.muted,
             source: e.source.label(),
             asks: matches!(e.source, Source::Ask { .. }),
             confirm_remove: false,
@@ -50,6 +52,7 @@ impl Detail {
             e.low_threshold = self.threshold;
             e.top_off_minutes = self.top_off;
             e.enabled = self.enabled;
+            e.muted = self.muted;
         }
         if super::save_config(&cfg) {
             self.saved_at = Some(std::time::Instant::now());
@@ -161,6 +164,14 @@ impl Detail {
                     ),
                     |ui| {
                         widgets::toggle(ui, &mut self.enabled);
+                    },
+                );
+                widgets::setting_row(
+                    ui,
+                    tr("Silenciar sus avisos", "Mute its alerts"),
+                    tr("Sin avisos de batería baja ni de carga completa", "No low battery or fully charged alerts"),
+                    |ui| {
+                        widgets::toggle(ui, &mut self.muted);
                     },
                 );
                 ui.add_space(6.0);

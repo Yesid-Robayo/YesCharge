@@ -123,7 +123,8 @@ folder for tests.
   known" is shown in between, with the time of the last message.
 - Many receivers can't tell asleep from off, so the app says "Asleep or off".
 - Some devices don't give a current percentage on the cable: the app shows "Charging" with no number.
-- Two identical devices share a VID:PID, so candidates grouped by VID:PID only show one.
+- Two identical devices share a VID:PID. Windows's container id tells them apart (`hid::pick`), but `on_cable` and
+  `receiver_alone` only look at USB ids, so with those two the state of one can show on the other.
 
 ## Español
 
@@ -247,4 +248,5 @@ pruebas.
   mensaje y otro se muestra "Último dato" con la hora del último mensaje.
 - Muchos receptores no distinguen entre dormido y apagado, así que la app dice "Dormido o apagado".
 - Algunos dispositivos no dan su porcentaje actual por cable: la app muestra "Cargando" sin número.
-- Dos dispositivos idénticos comparten VID:PID, y como los candidatos se agrupan por VID:PID, solo se ve uno.
+- Dos dispositivos idénticos comparten VID:PID. El contenedor de Windows los distingue (`hid::pick`), pero `on_cable` y
+  `receiver_alone` solo miran identificadores USB, así que con esos dos el estado de uno puede verse en el otro.

@@ -18,8 +18,8 @@ use windows_sys::Win32::Devices::HumanInterfaceDevice::{
     HidD_GetPreparsedData, HidP_Feature, HidP_GetUsageValue, HidP_GetValueCaps, HidP_Input,
 };
 use windows_sys::Win32::Devices::Properties::{
-    DEVPKEY_Device_DeviceDesc, DEVPKEY_Device_FriendlyName, DEVPROP_TYPE_BOOLEAN, DEVPROP_TYPE_BYTE,
-    DEVPROP_TYPE_STRING, DEVPROPTYPE,
+    DEVPKEY_Device_ContainerId, DEVPKEY_Device_DeviceDesc, DEVPKEY_Device_FriendlyName, DEVPROP_TYPE_BOOLEAN,
+    DEVPROP_TYPE_BYTE, DEVPROP_TYPE_GUID, DEVPROP_TYPE_STRING, DEVPROPTYPE,
 };
 use windows_sys::Win32::Foundation::{CloseHandle, DEVPROPKEY, GENERIC_READ, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::Storage::FileSystem::{CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING};
@@ -130,6 +130,14 @@ fn present_device_ids() -> Vec<String> {
 fn bluetooth_battery_of(inst: u32) -> Option<u8> {
     let (ty, buf) = devnode_property(inst, &DEVPKEY_BLUETOOTH_BATTERY)?;
     (ty == DEVPROP_TYPE_BYTE && !buf.is_empty() && buf[0] <= 100).then_some(buf[0])
+}
+
+/// Identificador con que Windows agrupa las interfaces de un mismo aparato físico, a partir de la
+/// ruta de una de ellas (`\\?\hid#vid_...#...#{guid}`).
+pub fn container_id(path: &str) -> Option<String> {
+    let instance = path.strip_prefix(r"\\?\")?.rsplit_once('#')?.0.replace('#', "\\");
+    let (ty, buf) = devnode_property(locate(&instance)?, &DEVPKEY_Device_ContainerId)?;
+    (ty == DEVPROP_TYPE_GUID && buf.len() == 16).then(|| buf.iter().map(|b| format!("{b:02x}")).collect())
 }
 
 fn bluetooth_connected(inst: u32) -> Option<bool> {

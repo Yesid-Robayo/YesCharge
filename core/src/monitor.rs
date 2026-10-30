@@ -76,10 +76,10 @@ pub fn read_source(
 ) -> RawReading {
     match source {
         Source::Listen { profile } => hub.read(profile),
-        Source::Ask { query, .. } => {
+        Source::Ask { query, container, .. } => {
             let profile = source.listens_to();
             let heard = profile.as_ref().and_then(|p| hub.state(p));
-            let asked = crate::ask::read(query, ask_every);
+            let asked = crate::ask::read(query, container.as_deref(), ask_every);
             // Responder demuestra que está encendido, aunque se perdiera el aviso: así nunca se
             // queda diciendo "apagado".
             if asked.presence == Presence::Online {
@@ -100,12 +100,12 @@ pub fn read_source(
         }
         Source::Bluetooth { instance_id } => crate::sources::read_bluetooth(instance_id),
         Source::Xinput { slot } => crate::sources::read_xinput(*slot),
-        Source::HidStandard { vid, pid, usage_page, usage } => {
+        Source::HidStandard { vid, pid, usage_page, usage, container } => {
             let all = crate::hid::enumerate();
-            match all
+            let found = all
                 .iter()
-                .find(|i| i.vid == *vid && i.pid == *pid && i.usage_page == *usage_page && i.usage == *usage)
-            {
+                .filter(|i| i.vid == *vid && i.pid == *pid && i.usage_page == *usage_page && i.usage == *usage);
+            match crate::hid::pick(found, container.as_deref()) {
                 Some(i) => crate::sources::read_standard_battery(i),
                 None => RawReading::absent(Presence::NotFound, "no detectado"),
             }
@@ -365,9 +365,9 @@ impl Monitor {
                     }
                 }
                 None if matches!(charge, Charge::Charging | Charge::Full) => {
-                    // p. ej. mando por cable: carga sin porcentaje
-                    let battery = st.known.as_ref().and_then(|k| k.battery);
-                    st.known = Some(KnownReading { battery, charge, at: now as u64 });
+                    // p. ej. mando por cable: carga sin porcentaje, así que el último número deja de
+                    // valer aunque luego se apague sin haber dado otro
+                    st.known = Some(KnownReading { battery: None, charge, at: now as u64 });
                     apply_top_off(st, entry, cfg, now, charge, &mut ds, &mut events);
                     ds.eta = if charge == Charge::Full {
                         charge_eta(st, entry, now, &ds).unwrap_or_default()
@@ -446,7 +446,7 @@ fn apply_top_off(
     }
     if ds.full && !st.full_notified {
         st.full_notified = true;
-        if cfg.notify_full {
+        if cfg.notify_full && !entry.muted {
             events.full.push(entry.name.clone());
         }
     }
@@ -464,7 +464,7 @@ fn apply_low(
 ) {
     if !ds.low {
         st.last_low_notify = 0.0;
-    } else if cfg.notify_low && now - st.last_low_notify >= cfg.renotify_minutes as f64 * 60.0 {
+    } else if cfg.notify_low && !entry.muted && now - st.last_low_notify >= cfg.renotify_minutes as f64 * 60.0 {
         st.last_low_notify = now;
         events.low.push((entry.name.clone(), battery));
     }
@@ -510,6 +510,7 @@ mod tests {
                 top_off_minutes: 30,
                 enabled: true,
                 initial: None,
+                muted: false,
             }],
             ..Config::default()
         }
@@ -522,7 +523,7 @@ mod tests {
     }
 
     fn listen_profile() -> crate::listen::ListenProfile {
-        crate::listen::ListenProfile { vid: 1, pid: 2, signals: Vec::new() }
+        crate::listen::ListenProfile { vid: 1, pid: 2, signals: Vec::new(), container: None }
     }
 
     fn online(b: u8, charge: Charge) -> RawReading {
@@ -548,7 +549,7 @@ mod tests {
 
     #[test]
     fn charging_without_a_percentage_does_not_show_the_old_number() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, false, 1000.0, &mut |_, _| online(76, Charge::Discharging));
         let on_cable = || RawReading {
@@ -566,7 +567,7 @@ mod tests {
 
     #[test]
     fn a_device_without_percentage_still_says_when_it_finished() {
-        let mut c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let mut c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         c.devices[0].top_off_minutes = 0;
         let reading =
             |charge| RawReading { presence: Presence::Online, charge, no_percentage: true, ..Default::default() };
@@ -581,7 +582,7 @@ mod tests {
 
     #[test]
     fn repeating_what_was_heard_does_not_freeze_the_percentage() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let heard = || RawReading {
             presence: Presence::Online,
             charge: Charge::Discharging,
@@ -605,7 +606,7 @@ mod tests {
 
     #[test]
     fn what_was_heard_does_not_hide_repeated_errors() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let heard = || RawReading {
             presence: Presence::Online,
             charge: Charge::Charging,
@@ -625,7 +626,7 @@ mod tests {
 
     #[test]
     fn asking_is_not_sent_on_startup_with_the_pc_idle() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut sent = 0;
         let (snap, _) = monitor().cycle(&c, 9999.0, true, 1000.0, &mut |_, send| {
             sent += send as u32;
@@ -636,8 +637,35 @@ mod tests {
     }
 
     #[test]
+    fn a_device_charged_without_a_percentage_forgets_the_old_number() {
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
+        let mut m = monitor();
+        m.cycle(&c, 0.0, false, 1000.0, &mut |_, _| online(76, Charge::Discharging));
+        m.cycle(&c, 0.0, false, 1060.0, &mut |_, _| RawReading {
+            presence: Presence::Online,
+            charge: Charge::Charging,
+            no_percentage: true,
+            ..Default::default()
+        });
+        let (snap, _) = m.cycle(&c, 0.0, false, 1120.0, &mut |_, _| RawReading::absent(Presence::Off, "apagado"));
+        assert_eq!((snap.devices[0].presence, snap.devices[0].battery), (Presence::Off, None));
+    }
+
+    #[test]
+    fn a_muted_device_gives_no_alerts() {
+        let mut c = cfg_with(Source::Xinput { slot: 0 });
+        c.devices[0].muted = true;
+        c.devices[0].low_threshold = 20;
+        let mut m = monitor();
+        for i in 0..4 {
+            let (_, ev) = m.cycle(&c, 0.0, true, 1000.0 + i as f64 * 700.0, &mut |_, _| online(5, Charge::Discharging));
+            assert!(ev.low.is_empty());
+        }
+    }
+
+    #[test]
     fn an_asked_device_that_disappeared_comes_back_at_once() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, false, 1000.0, &mut |_, _| RawReading::absent(Presence::NotFound, "no detectado"));
         let (snap, _) = m.cycle(&c, 0.0, false, 1060.0, &mut |_, _| online(78, Charge::Discharging));
@@ -646,7 +674,8 @@ mod tests {
 
     #[test]
     fn idle_pc_does_not_poll_sources_that_reach_the_device() {
-        let (mut m, c) = (monitor(), cfg_with(Source::HidStandard { vid: 1, pid: 2, usage_page: 6, usage: 32 }));
+        let (mut m, c) =
+            (monitor(), cfg_with(Source::HidStandard { vid: 1, pid: 2, usage_page: 6, usage: 32, container: None }));
         let mut calls = 0;
         m.cycle(&c, 0.0, false, 0.0, &mut |_, _| {
             calls += 1;
@@ -746,7 +775,7 @@ mod tests {
 
     #[test]
     fn repeated_errors_stop_the_questions_until_the_user_resumes() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         let mut calls = 0;
         let mut paused = 0;
@@ -772,7 +801,7 @@ mod tests {
 
     #[test]
     fn asking_never_happens_with_the_pc_idle() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         let mut sent = 0;
         m.cycle(&c, 0.0, false, 1000.0, &mut |_, send| {
@@ -789,7 +818,7 @@ mod tests {
 
     #[test]
     fn with_the_pc_idle_a_notice_still_shows_without_sending_anything() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, false, 1000.0, &mut |_, _| online(50, Charge::Discharging));
         let (snap, _) = m.cycle(&c, 9999.0, false, 2000.0, &mut |_, send| {
@@ -801,7 +830,7 @@ mod tests {
 
     #[test]
     fn a_question_too_soon_keeps_the_device_as_it_was() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, true, 1000.0, &mut |_, _| online(50, Charge::Discharging));
         let (snap, _) = m.cycle(&c, 0.0, true, 1010.0, &mut |_, _| RawReading::absent(Presence::Stale, ""));
@@ -842,7 +871,7 @@ mod tests {
 
     #[test]
     fn a_charge_notice_keeps_the_percentage_for_an_asking_device() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, true, 1000.0, &mut |_, _| online(53, Charge::Discharging));
         let notice = merge(RawReading::absent(Presence::Stale, ""), heard(false, Some(Charge::Charging)));
@@ -853,7 +882,7 @@ mod tests {
 
     #[test]
     fn turning_an_asking_device_on_shows_at_once() {
-        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None });
+        let c = cfg_with(Source::Ask { query: "x".into(), accepted_at: 1, notices: None, container: None });
         let mut m = monitor();
         m.cycle(&c, 0.0, false, 1000.0, &mut |_, _| online(53, Charge::Discharging));
         m.cycle(&c, 0.0, false, 1010.0, &mut |_, _| RawReading::absent(Presence::Off, "apagado"));

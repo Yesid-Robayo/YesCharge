@@ -175,8 +175,8 @@ Para desinstalar: en los ajustes, pulsa **Desinstalar…**, elige si conservas t
    cable → quítalo → apágalo → enciéndelo); después elige qué valor coincide con tu batería.
 5. Si tu modelo se puede preguntar y aceptas el aviso de riesgo, el asistente sigue esos mismos cinco pasos y te dice qué
    notó. Tarda unos minutos, porque pregunta como mucho una vez por minuto. Los últimos pasos siguen solos.
-6. Desde entonces vive en la **bandeja**: clic izquierdo abre la ventana; clic derecho muestra el nivel de cada
-   dispositivo y las opciones.
+6. Desde entonces vive en la **bandeja**: clic izquierdo abre un panel rápido con los niveles; clic derecho muestra esos
+   mismos niveles y las opciones.
 
 Cerrar la ventana no cierra YesCharge: sigue vigilando desde la bandeja. Para cerrarlo del todo: clic derecho en el
 icono → **Salir**.
@@ -206,8 +206,9 @@ avisar de un error) y `captures\` (informes de escucha).
 `%APPDATA%\YesCharge`, salvo que pulses **Guardar los datos junto al exe** en los ajustes: entonces viajan con él, en una
 carpeta `YesChargeData`.
 
-**¿Y si tengo dos auriculares?** Si son modelos distintos, funcionan los dos: añades cada uno y el encendido sale primero.
-Dos iguales todavía no: Windows les da el mismo identificador, así que la app solo ve uno.
+**¿Y si tengo dos auriculares?** Funcionan los dos: añades cada uno y el encendido sale primero. Si son iguales, salen
+numerados en el asistente. En los modelos que se detectan por su identificador USB, conectar uno puede marcar los dos como
+cargando.
 
 **¿Por qué tarda en cambiar?** Algunos modelos no avisan por su cuenta, así que YesCharge les pregunta cada minuto. Un
 cambio puede tardar hasta un minuto en verse.

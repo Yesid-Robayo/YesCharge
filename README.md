@@ -172,8 +172,8 @@ To uninstall: in the settings, press **Uninstall…**, choose whether to keep yo
    (without cable → plug the cable → unplug it → turn it off → turn it on), then pick which value matches your battery.
 5. If your model can be asked and you accept the risk warning, the wizard follows those same five steps and tells you
    what it noticed. It takes a few minutes, because it asks at most once a minute. The last steps continue on their own.
-6. From then on it lives in the **tray**: left click opens the window; right click shows each device's level and the
-   options.
+6. From then on it lives in the **tray**: left click opens a quick panel with the levels; right click shows the same
+   levels and the options.
 
 Closing the window doesn't close YesCharge: it keeps watching from the tray. To close it completely: right-click the
 icon → **Quit**.
@@ -203,8 +203,8 @@ bug report) and `captures\` (listening reports).
 `%APPDATA%\YesCharge`, unless you press **Keep the data next to the exe** in the settings: then they travel with it, in a
 `YesChargeData` folder.
 
-**What if I have two headsets?** If they're different models, both work: you add each one, and the one that's on goes
-first. Two identical ones aren't supported yet: Windows gives them the same id, so the app only sees one.
+**What if I have two headsets?** Both work: you add each one, and the one that's on goes first. If they're identical they
+show up numbered in the wizard. With models that are detected by their USB id, plugging one in can show both as charging.
 
 **Why does it take a while to change?** Some models give no notice of their own, so YesCharge asks them every minute. A
 change can take up to a minute to show.
