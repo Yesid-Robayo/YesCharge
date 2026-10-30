@@ -13,6 +13,9 @@ pub struct Settings {
     cfg: Config,
     original: Config,
     saved_at: Option<std::time::Instant>,
+    confirm_uninstall: bool,
+    /// Se calcula una sola vez: `show` corre en cada fotograma y no debe tocar el disco.
+    portable: bool,
 }
 
 const POLL_CHOICES: [(u32, &str); 5] =
@@ -21,7 +24,13 @@ const POLL_CHOICES: [(u32, &str); 5] =
 impl Settings {
     pub fn new() -> Self {
         let cfg = Config::load();
-        Self { original: cfg.clone(), cfg, saved_at: None }
+        Self {
+            original: cfg.clone(),
+            cfg,
+            saved_at: None,
+            confirm_uninstall: false,
+            portable: yescharge_core::paths::is_portable(),
+        }
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui, logo: &TextureHandle) -> Nav {
@@ -41,6 +50,26 @@ impl Settings {
                         }
                     }
                 });
+            });
+
+            widgets::section_title(ui, tr("Lista de dispositivos", "Device list"));
+            widgets::card(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let auto = tr("Encendidos primero", "Turned on first");
+                    if widgets::choice_chip(ui, auto, c.auto_sort).clicked() {
+                        c.auto_sort = true;
+                    }
+                    if widgets::choice_chip(ui, tr("Orden fijo", "Fixed order"), !c.auto_sort).clicked() {
+                        c.auto_sort = false;
+                    }
+                });
+                widgets::muted(
+                    ui,
+                    tr(
+                        "Arrastra un dispositivo en la lista para colocarlo donde quieras: pasa a orden fijo.",
+                        "Drag a device in the list to put it where you want: it switches to fixed order.",
+                    ),
+                );
             });
 
             widgets::section_title(ui, tr("Avisos", "Alerts"));
@@ -101,6 +130,20 @@ impl Settings {
                     }
                 });
                 widgets::muted(ui, tr("Si algo falla, adjunta yescharge.log en un issue de GitHub.", "If something fails, attach yescharge.log to a GitHub issue."));
+                if self.portable {
+                    widgets::muted(ui, tr("Portable: tus datos están junto al exe.", "Portable: your data is next to the exe."));
+                } else if widgets::secondary_button(
+                    ui,
+                    tr("Guardar los datos junto al exe (portable)", "Keep the data next to the exe (portable)"),
+                    ui.available_width(),
+                )
+                .clicked()
+                {
+                    match make_portable() {
+                        Ok(()) => restart(ui),
+                        Err(e) => yescharge_core::log::error(&format!("no se pudo pasar a portable: {e}")),
+                    }
+                }
             });
 
             widgets::section_title(ui, tr("Acerca de", "About"));
@@ -119,15 +162,45 @@ impl Settings {
                         .size(13.0)
                         .color(MUTED),
                 );
-                if ui.link("GitHub").clicked() {
-                    ipc::open_external(yescharge_core::REPO_URL);
-                }
+                ui.horizontal(|ui| {
+                    if ui.link(tr("Buscar actualización", "Check for updates")).clicked() {
+                        ipc::open_external(&format!("{}/releases/latest", yescharge_core::REPO_URL));
+                    }
+                    if ui.link("GitHub").clicked() {
+                        ipc::open_external(yescharge_core::REPO_URL);
+                    }
+                });
             });
 
             ui.add_space(8.0);
             if widgets::danger_button(ui, tr("Cerrar YesCharge por completo", "Quit YesCharge completely"), ui.available_width()).clicked() {
                 ipc::send(ipc::MSG_QUIT);
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            if !self.confirm_uninstall {
+                if widgets::secondary_button(ui, tr("Desinstalar…", "Uninstall…"), ui.available_width()).clicked() {
+                    self.confirm_uninstall = true;
+                }
+            } else {
+                widgets::card(ui, |ui| {
+                    ui.label(egui::RichText::new(tr("¿Desinstalar YesCharge?", "Uninstall YesCharge?")).font(theme::semibold(14.5)));
+                    widgets::muted(
+                        ui,
+                        tr(
+                            "Quita el inicio con Windows y cierra la app. El exe lo borras tú.",
+                            "It removes the start with Windows and closes the app. You delete the exe yourself.",
+                        ),
+                    );
+                    if widgets::secondary_button(ui, tr("Desinstalar y conservar mis datos", "Uninstall and keep my data"), ui.available_width()).clicked() {
+                        uninstall(ui, false);
+                    }
+                    if widgets::danger_button(ui, tr("Desinstalar y borrar mis datos", "Uninstall and delete my data"), ui.available_width()).clicked() {
+                        uninstall(ui, true);
+                    }
+                    if widgets::secondary_button(ui, tr("Cancelar", "Cancel"), ui.available_width()).clicked() {
+                        self.confirm_uninstall = false;
+                    }
+                });
             }
             ui.add_space(12.0);
         });
@@ -143,4 +216,38 @@ impl Settings {
         }
         Nav::Stay
     }
+}
+
+/// Copia los ajustes a la carpeta portable. Desde ese momento la app usa esa carpeta.
+fn make_portable() -> std::io::Result<()> {
+    let target = yescharge_core::paths::portable_dir().ok_or(std::io::ErrorKind::NotFound)?;
+    let source = yescharge_core::paths::data_dir();
+    std::fs::create_dir_all(&target)?;
+    for name in ["config.json", "history.json", "model.json", "state.json"] {
+        if source.join(name).exists() {
+            std::fs::copy(source.join(name), target.join(name))?;
+        }
+    }
+    Ok(())
+}
+
+fn restart(ui: &egui::Ui) {
+    ipc::send(ipc::MSG_QUIT);
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    ipc::spawn_self("--start");
+    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+}
+
+fn uninstall(ui: &egui::Ui, delete_data: bool) {
+    let mut cfg = Config::load();
+    cfg.start_with_windows = false;
+    let _ = cfg.save();
+    crate::autostart::apply(false);
+    ipc::send(ipc::MSG_QUIT);
+    if delete_data {
+        // el servicio escribe sus últimos datos al salir
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let _ = std::fs::remove_dir_all(yescharge_core::paths::data_dir());
+    }
+    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
 }

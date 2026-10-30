@@ -21,6 +21,8 @@ pub struct Detail {
     asks: bool,
     confirm_remove: bool,
     saved_at: Option<std::time::Instant>,
+    /// La gráfica muestra 7 días en vez de 24 horas.
+    week: bool,
 }
 
 impl Detail {
@@ -36,6 +38,7 @@ impl Detail {
             asks: matches!(e.source, Source::Ask { .. }),
             confirm_remove: false,
             saved_at: None,
+            week: false,
         }
     }
 
@@ -97,8 +100,18 @@ impl Detail {
             ui.add_space(8.0);
 
             if let Some(d) = status {
-                widgets::section_title(ui, tr("Últimas 24 horas", "Last 24 hours"));
-                widgets::card(ui, |ui| history_chart(ui, d, now));
+                widgets::section_title(ui, tr("Historial", "History"));
+                widgets::card(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        if widgets::choice_chip(ui, "24 h", !self.week).clicked() {
+                            self.week = false;
+                        }
+                        if widgets::choice_chip(ui, tr("7 días", "7 days"), self.week).clicked() {
+                            self.week = true;
+                        }
+                    });
+                    history_chart(ui, d, now, self.week);
+                });
             }
 
             widgets::section_title(ui, tr("Ajustes", "Settings"));
@@ -222,7 +235,8 @@ impl Detail {
     }
 }
 
-fn history_chart(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) {
+fn history_chart(ui: &mut egui::Ui, d: &DeviceStatus, now: f64, week: bool) {
+    let (points, hours) = if week { (&d.history_week, 24.0 * 7.0) } else { (&d.history, 24.0) };
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 130.0), Sense::hover());
     let p = ui.painter();
     let plot =
@@ -238,19 +252,20 @@ fn history_chart(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) {
             FAINT,
         );
     }
-    for (h, label) in [(24.0, "-24 h"), (12.0, "-12 h"), (0.0, tr("ahora", "now"))] {
-        let x = plot.right() - plot.width() * (h / 24.0);
-        let align = if h == 24.0 {
+    let (old, middle) = if week { ("-7 d", "-3,5 d") } else { ("-24 h", "-12 h") };
+    for (f, label) in [(1.0, old), (0.5, middle), (0.0, tr("ahora", "now"))] {
+        let x = plot.right() - plot.width() * f;
+        let align = if f == 1.0 {
             Align2::LEFT_CENTER
-        } else if h == 0.0 {
+        } else if f == 0.0 {
             Align2::RIGHT_CENTER
         } else {
             Align2::CENTER_CENTER
         };
         p.text(pos2(x, rect.bottom() - 6.0), align, label, egui::FontId::proportional(10.5), FAINT);
     }
-    if d.history.len() >= 2 {
-        widgets::sparkline(ui, plot, &d.history, now, super::ring_color(d));
+    if points.len() >= 2 {
+        widgets::sparkline(ui, plot, points, now, hours, super::ring_color(d));
     } else {
         p.text(
             plot.center(),

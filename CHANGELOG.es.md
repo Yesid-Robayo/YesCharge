@@ -31,9 +31,12 @@ dispositivo.
 - **Icono en la bandeja** con el nivel más bajo y un rayo mientras algo carga; menú con el nivel de cada dispositivo.
 - **Avisos de Windows** de batería baja (se repite mientras siga baja) y de carga completa.
 - **Margen de carga** tras el 100 %, para no desconectarlo antes de tiempo.
-- **Autonomía aprendida** y **gráfica de 24 horas** de cada dispositivo.
+- **Autonomía aprendida**, **historial de 24 horas y 7 días** de cada dispositivo y tiempo que falta para cargar, cuando
+  se puede estimar.
+- **Lista ordenada a tu gusto**: los encendidos primero, o el orden fijo que elijas arrastrando cada dispositivo.
 - **Botón Actualizar**: la lista muestra "Actualizando…" y vuelve con los datos nuevos, para que se note que hizo algo.
 - **Español e inglés**: empieza en español y se cambia en los ajustes.
+- **Buscar actualización** y **Desinstalar** en los ajustes, conservando o borrando tus datos.
 - **API local opcional** en `127.0.0.1` (desactivada por defecto), con `/v1/status` y el formato compacto `/min`.
 
 ### Qué muestra en cada estado
@@ -58,13 +61,14 @@ dispositivo.
   PC inactivo y se detiene sola tras 3 errores seguidos.
 - **Sin telemetría, sin cuentas y sin actualizaciones automáticas.**
 - **No se inicia con Windows** salvo que lo actives en los ajustes.
-- **No despierta tus dispositivos** mientras el PC está inactivo.
-- **Portable y ligera**: un exe de unos 5 MB, sin instalador ni runtime; la ventana es un proceso aparte que solo existe
-  mientras está abierta.
+- **No despierta tus dispositivos** mientras el PC está inactivo: entonces solo mira lo que no necesita preguntar.
+- **Portable y ligera**: un exe de unos 5 MB, sin instalador ni runtime, y puedes guardar tus datos junto a él; la ventana
+  es un proceso aparte que solo existe mientras está abierta.
 
 ### Limitaciones conocidas
 
 - Los modelos que no avisan por su cuenta (Mars68 y GameSir) tardan hasta un minuto en mostrar un cambio.
 - Jugar solo con un mando cuenta como PC inactivo para Windows, así que mientras tanto la app no pregunta.
 - El aviso de carga terminada todavía no se ha probado con una carga completa real.
+- Dos dispositivos idénticos no se distinguen: Windows les da el mismo identificador y la app solo ve uno.
 - El exe no está firmado, así que Windows SmartScreen puede avisarte la primera vez.

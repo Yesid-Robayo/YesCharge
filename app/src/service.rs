@@ -238,10 +238,10 @@ fn worker(hwnd: isize, rx: Receiver<Cmd>, notify: Sender<Cmd>, shared: Arc<Mutex
     loop {
         let idle = yescharge_core::idle::idle_seconds();
         let poll = Duration::from_secs(cfg.poll_seconds as u64);
-        let (snap, events) = monitor.cycle(&cfg, idle, force, now_secs(), &mut |e| {
+        let (snap, events) = monitor.cycle(&cfg, idle, force, now_secs(), &mut |e, send| {
             // con avisos no hace falta preguntarle tan seguido
             let every = if force || e.source.only_by_asking() { ask::MIN_GAP } else { poll };
-            read_source(&e.source, &mut hub, every)
+            read_source(&e.source, &mut hub, send.then_some(every))
         });
         let listening: Vec<_> = cfg.devices.iter().filter_map(|d| d.source.listens_to()).collect();
         hub.retain(&listening.iter().collect::<Vec<_>>());

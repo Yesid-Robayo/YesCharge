@@ -64,7 +64,8 @@ YesCharge ask. That option is off, it's per device, and you have to accept a ris
 - **Top-off margin**: after reaching 100 %, it keeps showing "charging" for the minutes you choose before saying it's
   full.
 - **Learned battery life**: it measures how long each 10 % lasts and estimates the time left.
-- **24-hour chart** for each device.
+- **History of 24 hours and 7 days** for each device, and the time left to charge when it can be estimated.
+- **The list orders itself**, with what's on first, or stays in the order you choose: drag a device to move it.
 - **Doesn't wake your devices**: while the PC is idle it doesn't read anything.
 - **Light**: one ~5 MB exe, no runtime to install. The tray part uses a few MB of memory; the window is a separate
   process that only exists while it's open.
@@ -159,7 +160,7 @@ If you try it with your device, an *issue* saying whether it worked (and which m
 > The exe is not signed with a paid certificate, so Windows SmartScreen may warn you the first time. Choose **More
 > info → Run anyway** if the SHA256 matches.
 
-To uninstall: turn off *Start with Windows* in the settings, right-click the tray icon → **Quit**, and delete the exe and the `%APPDATA%\YesCharge` folder.
+To uninstall: in the settings, press **Uninstall…**, choose whether to keep your data, and delete the exe.
 
 ## 🎮 How to use it
 
@@ -182,6 +183,7 @@ icon → **Quit**.
 | Setting | What it does |
 |---|---|
 | Language | Spanish (default) or English. |
+| Device list | Turned on first (default) or fixed order. Dragging a device moves it and switches to fixed order. |
 | Low battery / Fully charged | Turn each notification on or off. |
 | Repeat the low battery alert | Every how many minutes it reminds you while the battery stays low. |
 | Check the battery every | 1, 2, 5, 10 or 15 minutes. Devices that give no notice of their own are asked every minute. |
@@ -198,7 +200,11 @@ bug report) and `captures\` (listening reports).
 ## ❓ FAQ
 
 **Is it portable?** Yes. It's one exe with no installer: put it wherever you want. Your settings are kept in
-`%APPDATA%\YesCharge`.
+`%APPDATA%\YesCharge`, unless you press **Keep the data next to the exe** in the settings: then they travel with it, in a
+`YesChargeData` folder.
+
+**What if I have two headsets?** If they're different models, both work: you add each one, and the one that's on goes
+first. Two identical ones aren't supported yet: Windows gives them the same id, so the app only sees one.
 
 **Why does it take a while to change?** Some models give no notice of their own, so YesCharge asks them every minute. A
 change can take up to a minute to show.

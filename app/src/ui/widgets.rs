@@ -310,12 +310,12 @@ pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
     resp.on_hover_cursor(CursorIcon::PointingHand)
 }
 
-/// Gráfica de las últimas 24 h: línea + relleno degradado.
-pub fn sparkline(ui: &Ui, rect: Rect, pts: &[(f64, u8)], now: f64, color: Color32) {
+/// Gráfica de las últimas `hours` horas: línea + relleno degradado.
+pub fn sparkline(ui: &Ui, rect: Rect, pts: &[(f64, u8)], now: f64, hours: f64, color: Color32) {
     if pts.len() < 2 {
         return;
     }
-    let span = 24.0 * 3600.0;
+    let span = hours * 3600.0;
     let to_pos = |(t, v): (f64, u8)| {
         let x = rect.left() + rect.width() * (1.0 - ((now - t) / span).clamp(0.0, 1.0) as f32);
         let y = rect.bottom() - rect.height() * (v as f32 / 100.0);

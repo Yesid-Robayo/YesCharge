@@ -66,7 +66,9 @@ YesCharge les pregunte. Esa opción viene apagada, es por dispositivo y hay que 
 - **Margen de carga**: al llegar al 100 % sigue mostrando "cargando" los minutos que elijas antes de decir que está
   completo.
 - **Autonomía aprendida**: mide cuánto dura cada 10 % y estima el tiempo que queda.
-- **Gráfica de 24 horas** de cada dispositivo.
+- **Historial de 24 horas y 7 días** de cada dispositivo, y el tiempo que falta para cargar cuando se puede estimar.
+- **La lista se ordena sola**, con lo encendido primero, o se queda en el orden que elijas: arrastra un dispositivo para
+  moverlo.
 - **No despierta tus dispositivos**: mientras el PC está inactivo no lee nada.
 - **Ligera**: un exe de unos 5 MB, sin runtime que instalar. La parte de la bandeja ocupa pocos MB de memoria; la
   ventana es un proceso aparte que solo existe mientras está abierta.
@@ -161,8 +163,7 @@ Si lo pruebas con tu dispositivo, un *issue* diciendo si funcionó (y con qué m
 > El exe no está firmado con un certificado de pago, así que Windows SmartScreen puede avisarte la primera vez. Elige
 > **Más información → Ejecutar de todas formas** si el SHA256 coincide.
 
-Para desinstalar: desactiva *Iniciar con Windows* en los ajustes, clic derecho en el icono de la bandeja → **Salir**, y
-borra el exe y la carpeta `%APPDATA%\YesCharge`.
+Para desinstalar: en los ajustes, pulsa **Desinstalar…**, elige si conservas tus datos y borra el exe.
 
 ## 🎮 Cómo se usa
 
@@ -185,6 +186,7 @@ icono → **Salir**.
 | Ajuste | Qué hace |
 |---|---|
 | Idioma | Español (por defecto) o inglés. |
+| Lista de dispositivos | Encendidos primero (por defecto) u orden fijo. Arrastrar un dispositivo lo mueve y pasa a orden fijo. |
 | Batería baja / Carga completa | Activa o desactiva cada aviso. |
 | Repetir el aviso de batería baja | Cada cuántos minutos te lo recuerda mientras siga baja. |
 | Consultar la batería cada | 1, 2, 5, 10 o 15 minutos. A los dispositivos que no avisan por su cuenta se les pregunta cada minuto. |
@@ -201,7 +203,11 @@ avisar de un error) y `captures\` (informes de escucha).
 ## ❓ Preguntas frecuentes
 
 **¿Es portable?** Sí. Es un solo exe sin instalador: ponlo donde quieras. Tus ajustes se guardan en
-`%APPDATA%\YesCharge`.
+`%APPDATA%\YesCharge`, salvo que pulses **Guardar los datos junto al exe** en los ajustes: entonces viajan con él, en una
+carpeta `YesChargeData`.
+
+**¿Y si tengo dos auriculares?** Si son modelos distintos, funcionan los dos: añades cada uno y el encendido sale primero.
+Dos iguales todavía no: Windows les da el mismo identificador, así que la app solo ve uno.
 
 **¿Por qué tarda en cambiar?** Algunos modelos no avisan por su cuenta, así que YesCharge les pregunta cada minuto. Un
 cambio puede tardar hasta un minuto en verse.

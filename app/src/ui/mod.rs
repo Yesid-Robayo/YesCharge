@@ -12,7 +12,7 @@ use eframe::egui::{self, Align2, Color32, CornerRadius, Rect, Sense, Stroke, Str
 use yescharge_core::config::Config;
 use yescharge_core::i18n::tr;
 use yescharge_core::reading::{Charge, Presence};
-use yescharge_core::status::{DeviceStatus, Snapshot};
+use yescharge_core::status::{self, DeviceStatus, Snapshot};
 use yescharge_core::trf;
 
 use crate::ipc::{self, wide};
@@ -85,6 +85,12 @@ enum Page {
     Settings(Box<settings::Settings>),
 }
 
+/// Dispositivo que se está arrastrando y cómo va quedando la lista.
+struct Drag {
+    id: String,
+    order: Vec<String>,
+}
+
 pub enum Nav {
     Stay,
     Home,
@@ -101,6 +107,7 @@ struct App {
     last_refresh: Option<Instant>,
     /// Desde cuándo se espera un `status.json` más nuevo que el de ese momento.
     refreshing: Option<(Instant, f64)>,
+    drag: Option<Drag>,
 }
 
 impl App {
@@ -137,6 +144,7 @@ impl App {
             logo,
             last_refresh: None,
             refreshing: None,
+            drag: None,
         };
         app.poll_files();
         app
@@ -324,7 +332,11 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
     }
 
     let footer_h = 96.0;
-    let devices = app.snapshot.devices.clone();
+    let ids: Vec<String> = app
+        .drag
+        .as_ref()
+        .map_or_else(|| app.cfg.devices.iter().map(|d| d.id.clone()).collect(), |drag| drag.order.clone());
+    let devices = status::ordered(&app.snapshot.devices, &ids, app.cfg.auto_sort && app.drag.is_none());
     egui::ScrollArea::vertical().max_height(ui.available_height() - footer_h).auto_shrink([false, false]).show(
         ui,
         |ui| {
@@ -335,13 +347,22 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
             if devices.is_empty() {
                 empty_state(ui);
             }
+            let mut cards = Vec::with_capacity(devices.len());
             for d in &devices {
-                if device_card(ui, d, app.snapshot.updated_at).clicked()
+                let dragged = app.drag.as_ref().is_some_and(|drag| drag.id == d.id);
+                let card = device_card(ui, d, app.snapshot.updated_at, dragged);
+                cards.push((d.id.clone(), card.rect));
+                if card.drag_started() && devices.len() > 1 {
+                    let order = devices.iter().map(|x| x.id.clone()).collect();
+                    app.drag = Some(Drag { id: d.id.clone(), order });
+                }
+                if card.clicked()
                     && let Some(entry) = app.cfg.devices.iter().find(|e| e.id == d.id)
                 {
                     next = Some(Page::Detail(Box::new(detail::Detail::new(entry))));
                 }
             }
+            drag_cards(ui, app, &cards);
         },
     );
 
@@ -366,6 +387,31 @@ fn home(ui: &mut egui::Ui, app: &mut App) -> Option<Page> {
         }
     });
     next
+}
+
+/// Mueve la tarjeta arrastrada sobre la que tiene debajo. Al soltarla, ese orden queda guardado y
+/// la lista pasa a orden fijo: el usuario ya eligió dónde va cada una.
+fn drag_cards(ui: &egui::Ui, app: &mut App, cards: &[(String, Rect)]) {
+    let Some(drag) = &mut app.drag else { return };
+    let (pointer, released) = ui.input(|i| (i.pointer.interact_pos(), i.pointer.any_released()));
+    if let Some(y) = pointer.map(|p| p.y)
+        && let Some((over, _)) = cards.iter().find(|(id, r)| *id != drag.id && y >= r.top() && y <= r.bottom())
+        && let (Some(from), Some(to)) =
+            (drag.order.iter().position(|id| *id == drag.id), drag.order.iter().position(|id| id == over))
+    {
+        let id = drag.order.remove(from);
+        drag.order.insert(to, id);
+    }
+    if released {
+        let order = std::mem::take(&mut drag.order);
+        app.drag = None;
+        let mut cfg = Config::load();
+        cfg.devices.sort_by_key(|d| order.iter().position(|id| *id == d.id).unwrap_or(usize::MAX));
+        cfg.auto_sort = false;
+        if save_config(&cfg) {
+            app.cfg = cfg;
+        }
+    }
 }
 
 fn empty_state(ui: &mut egui::Ui) {
@@ -395,12 +441,20 @@ fn empty_state(ui: &mut egui::Ui) {
     });
 }
 
-fn device_card(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) -> egui::Response {
+fn device_card(ui: &mut egui::Ui, d: &DeviceStatus, now: f64, dragged: bool) -> egui::Response {
     let width = ui.available_width();
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, 100.0), Sense::click());
+    let (rect, _) = ui.allocate_exact_size(vec2(width, 100.0), Sense::hover());
+    // el id no depende del sitio en la lista: si no, se perdería el arrastre al cambiar de lugar
+    let resp = ui.interact(rect, egui::Id::unique(("device_card", &d.id)), Sense::click_and_drag());
     let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.12);
     let p = ui.painter();
-    let border = if d.low { theme::alpha(LOW, 0.55) } else { theme::lerp(BORDER, theme::alpha(BRAND_A, 0.5), hover) };
+    let border = if dragged {
+        BRAND_A
+    } else if d.low {
+        theme::alpha(LOW, 0.55)
+    } else {
+        theme::lerp(BORDER, theme::alpha(BRAND_A, 0.5), hover)
+    };
     p.rect(
         rect,
         CornerRadius::same(18),
@@ -457,7 +511,7 @@ fn device_card(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) -> egui::Response 
         pos2(rect.right() - 18.0, rect.bottom() - 30.0),
     );
     if d.history.len() >= 2 {
-        widgets::sparkline(ui, spark, &d.history, now, color);
+        widgets::sparkline(ui, spark, &d.history, now, 24.0, color);
         p.text(
             pos2(spark.right(), spark.bottom() + 12.0),
             Align2::RIGHT_CENTER,
@@ -467,7 +521,7 @@ fn device_card(ui: &mut egui::Ui, d: &DeviceStatus, now: f64) -> egui::Response 
         );
     }
     ui.add_space(2.0);
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+    resp.on_hover_cursor(if dragged { egui::CursorIcon::Grabbing } else { egui::CursorIcon::PointingHand })
 }
 
 /// Guarda la configuración y avisa al servicio (o lo arranca si no está).

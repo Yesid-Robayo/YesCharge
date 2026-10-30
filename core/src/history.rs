@@ -8,11 +8,16 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-pub const WINDOW_H: f64 = 24.0;
-pub const CAP: usize = 2000;
+pub const WINDOW_H: f64 = 24.0 * 7.0;
+pub const CAP: usize = 2500;
 const MODEL_MAX_GAP_S: f64 = 3600.0;
-/// Separación mínima entre dos puntos con el mismo valor.
-const MIN_POINT_GAP_S: f64 = 60.0;
+/// Separación mínima entre dos puntos con el mismo valor. Con 7 días de historial, un punto por
+/// minuto reescribiría cientos de KB cada minuto sin que la gráfica lo muestre.
+const MIN_POINT_GAP_S: f64 = 300.0;
+/// Para estimar la carga: tiempo mínimo subiendo.
+const CHARGE_MIN_SPAN_S: f64 = 600.0;
+/// Un salto mayor entre dos lecturas no es carga, sino el voltaje al conectar el cable.
+const CHARGE_MAX_STEP: u8 = 3;
 const MODEL_MIN_PER_BUCKET: f64 = 2.0;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -128,11 +133,29 @@ impl History {
         })
     }
 
-    /// Serie reducida a `max_points` para dibujar la gráfica de 24 h.
-    pub fn sparkline(&self, id: &str, max_points: usize) -> Vec<(f64, u8)> {
-        let Some(pts) = self.points.get(id) else { return Vec::new() };
+    /// Minutos que faltan para llenarse al ritmo de la subida actual, si ya hay una subida medible.
+    pub fn charge_minutes(&self, id: &str) -> Option<f64> {
+        let pts = self.points.get(id)?;
+        let &(last_t, last) = pts.last()?;
+        let mut first = (last_t, last);
+        for pair in pts.windows(2).rev() {
+            let (a, b) = (pair[0], pair[1]);
+            if b.1 < a.1 || b.1 - a.1 > CHARGE_MAX_STEP {
+                break;
+            }
+            first = a;
+        }
+        let (span, rise) = (last_t - first.0, last.saturating_sub(first.1));
+        (span >= CHARGE_MIN_SPAN_S && rise >= 2).then(|| (100 - last.min(100)) as f64 * span / 60.0 / rise as f64)
+    }
+
+    /// Serie de las últimas `hours` reducida a `max_points` para dibujar la gráfica.
+    pub fn sparkline(&self, id: &str, now: f64, hours: f64, max_points: usize) -> Vec<(f64, u8)> {
+        let Some(all) = self.points.get(id) else { return Vec::new() };
+        let cutoff = now - hours * 3600.0;
+        let pts: Vec<(f64, u8)> = all.iter().filter(|p| p.0 >= cutoff).copied().collect();
         if pts.len() <= max_points {
-            return pts.clone();
+            return pts;
         }
         let step = pts.len() as f64 / max_points as f64;
         (0..max_points)
@@ -205,7 +228,27 @@ mod tests {
             assert!(!h.push("d", 1000.0 + i as f64 * 0.2, 50), "lo mismo, muy seguido: no es un punto nuevo");
         }
         assert!(h.push("d", 1010.0, 49), "un valor distinto siempre cuenta");
-        assert!(h.push("d", 1100.0, 49), "pasado un minuto, el mismo valor también cuenta");
+        assert!(!h.push("d", 1100.0, 49), "mismo valor al poco rato: no hace falta guardarlo");
+        assert!(h.push("d", 1400.0, 49), "pasados 5 minutos, el mismo valor también cuenta");
         assert_eq!(h.points["d"].len(), 3);
+    }
+
+    #[test]
+    fn charge_time_uses_the_steady_rise_and_ignores_the_cable_jump() {
+        let mut h = History::default();
+        for (t, pct) in [(0.0, 60), (60.0, 73), (360.0, 74), (660.0, 75), (960.0, 76), (1260.0, 77)] {
+            h.push("d", t, pct);
+        }
+        // 3 % en 15 minutos desde el salto: faltan 23 % a 5 minutos cada uno
+        assert_eq!(h.charge_minutes("d"), Some(115.0));
+        assert_eq!(h.sparkline("d", 1300.0, 0.1, 96).len(), 2, "solo la última parte");
+    }
+
+    #[test]
+    fn no_charge_time_until_it_really_rises() {
+        let mut h = History::default();
+        h.push("d", 0.0, 50);
+        h.push("d", 1000.0, 49);
+        assert_eq!(h.charge_minutes("d"), None);
     }
 }

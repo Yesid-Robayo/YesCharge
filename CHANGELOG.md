@@ -31,9 +31,12 @@ First version. It's a personal project in beta: **you use it at your own risk**,
 - **Tray icon** with the lowest level and a bolt while something charges; menu with every device's level.
 - **Windows notifications** for low battery (repeated while it stays low) and fully charged.
 - **Top-off margin** after 100 %, so you don't unplug it too soon.
-- **Learned battery life** and a **24-hour chart** for each device.
+- **Learned battery life**, a **24-hour and 7-day history** for each device, and the time left to charge when it can be
+  estimated.
+- **A list ordered your way**: what's on first, or the fixed order you choose by dragging each device.
 - **Refresh button**: the list shows "Updating…" and comes back with the new data, so you can tell it did something.
 - **Spanish and English**: it starts in Spanish and you can change it in the settings.
+- **Check for updates** and **Uninstall** in the settings, keeping or deleting your data.
 - **Optional local API** on `127.0.0.1` (off by default), with `/v1/status` and the compact `/min` format.
 
 ### What each state shows
@@ -58,13 +61,14 @@ First version. It's a personal project in beta: **you use it at your own risk**,
   it stops by itself after 3 errors in a row.
 - **No telemetry, no accounts and no automatic updates.**
 - **It doesn't start with Windows** unless you turn that on in the settings.
-- **Doesn't wake your devices** while the PC is idle.
-- **Portable and light**: one ~5 MB exe, with no installer or runtime; the window is a separate process that only exists
-  while it's open.
+- **Doesn't wake your devices** while the PC is idle: it then only checks what needs no asking.
+- **Portable and light**: one ~5 MB exe, with no installer or runtime, and you can keep your data next to it; the window
+  is a separate process that only exists while it's open.
 
 ### Known limitations
 
 - Models that give no notice of their own (Mars68 and GameSir) take up to a minute to show a change.
 - Playing only with a controller counts as an idle PC for Windows, so while you do that the app doesn't ask.
 - The fully charged alert hasn't been tried with a real full charge yet.
+- Two identical devices can't be told apart: Windows gives them the same id and the app only sees one.
 - The exe isn't signed, so Windows SmartScreen may warn you the first time.

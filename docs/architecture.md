@@ -59,7 +59,7 @@ YesCharge.exe [--background]        YesCharge.exe --window
 | `learn` | Learning mode: records what manufacturer interfaces send in five phases (no cable, cable, no cable, off, on) and looks for bytes that change with charging and stable 1-100 values. |
 | `listen` | User listening profiles. A profile is a list of signals, because a device can give each piece of data in a different message and interface. There's one background listener per interface that keeps the last thing heard. |
 | `monitor` | Polling cycle: median smoothing, margin after 100 %, repeated alerts, trend, battery life and the rule of not checking while the PC is idle. |
-| `history` | 24-hour history and battery life model learned in 10 % steps. |
+| `history` | 7-day history and battery life model learned in 10 % steps. |
 | `i18n` | Interface language: each text sits where it's used, in both languages (`tr`, `trf!`). Logs aren't translated. |
 | `config`, `status`, `paths`, `log` | Files in `%APPDATA%\YesCharge`, always validated and written atomically. |
 
@@ -96,12 +96,13 @@ that they were turned off. The others follow the interval in the settings.
 |---|---|
 | `config.json` | Settings and devices, with their source: Bluetooth, XInput, standard HID, listening profile or asking. |
 | `status.json` | Last status published by the service. |
-| `history.json`, `model.json` | 24-hour history and learned battery life. |
+| `history.json`, `model.json` | 7-day history and learned battery life. |
 | `state.json` | When each device reached 100 % and the last thing known, so they survive a restart. |
 | `yescharge.log` | Log with time, process and level; rotated past 512 KB. No personal data. |
 | `captures\` | The last 10 listening reports. They only leave the PC if the user attaches one to an *issue*. |
 
-`YESCHARGE_DATA_DIR` changes the folder (tests or portable mode).
+A `YesChargeData` folder next to the exe makes it portable: everything is kept there. `YESCHARGE_DATA_DIR` changes the
+folder for tests.
 
 ### Decisions
 
@@ -122,6 +123,7 @@ that they were turned off. The others follow the interval in the settings.
   known" is shown in between, with the time of the last message.
 - Many receivers can't tell asleep from off, so the app says "Asleep or off".
 - Some devices don't give a current percentage on the cable: the app shows "Charging" with no number.
+- Two identical devices share a VID:PID, so candidates grouped by VID:PID only show one.
 
 ## Español
 
@@ -180,7 +182,7 @@ YesCharge.exe [--background]        YesCharge.exe --window
 | `learn` | Modo aprendizaje: graba lo que envían las interfaces del fabricante en cinco fases (sin cable, con cable, sin cable, apagado, encendido) y busca bytes que cambian con la carga y valores 1-100 estables. |
 | `listen` | Perfiles de escucha del usuario. Un perfil es una lista de señales, porque un dispositivo puede dar cada dato en un mensaje e interfaz distintos. Hay una escucha de fondo por interfaz que guarda lo último que se oyó. |
 | `monitor` | Ciclo de consulta: suavizado por mediana, margen tras el 100 %, avisos con repetición, tendencia, autonomía y la regla de no consultar con el PC inactivo. |
-| `history` | Historial de 24 h y modelo de autonomía aprendido por tramos de 10 %. |
+| `history` | Historial de 7 días y modelo de autonomía aprendido por tramos de 10 %. |
 | `i18n` | Idioma de la interfaz: cada texto va en su sitio en los dos idiomas (`tr`, `trf!`). Los logs no se traducen. |
 | `config`, `status`, `paths`, `log` | Archivos de `%APPDATA%\YesCharge`, siempre validados y escritos de forma atómica. |
 
@@ -218,12 +220,13 @@ o que los apagaron. Los demás siguen el intervalo de los ajustes.
 |---|---|
 | `config.json` | Ajustes y dispositivos, con su fuente: Bluetooth, XInput, HID estándar, perfil de escucha o preguntar. |
 | `status.json` | Último estado publicado por el servicio. |
-| `history.json`, `model.json` | Historial de 24 h y autonomía aprendida. |
+| `history.json`, `model.json` | Historial de 7 días y autonomía aprendida. |
 | `state.json` | Cuándo llegó cada dispositivo al 100 % y su último dato conocido, para que sobrevivan a un reinicio. |
 | `yescharge.log` | Log con hora, proceso y nivel; se rota al pasar de 512 KB. Sin datos personales. |
 | `captures\` | Los 10 últimos informes de escucha. Solo salen del PC si el usuario adjunta uno a un *issue*. |
 
-`YESCHARGE_DATA_DIR` cambia la carpeta (pruebas o modo portable).
+Una carpeta `YesChargeData` junto al exe lo hace portable: todo se guarda ahí. `YESCHARGE_DATA_DIR` cambia la carpeta para
+pruebas.
 
 ### Decisiones
 
@@ -244,3 +247,4 @@ o que los apagaron. Los demás siguen el intervalo de los ajustes.
   mensaje y otro se muestra "Último dato" con la hora del último mensaje.
 - Muchos receptores no distinguen entre dormido y apagado, así que la app dice "Dormido o apagado".
 - Algunos dispositivos no dan su porcentaje actual por cable: la app muestra "Cargando" sin número.
+- Dos dispositivos idénticos comparten VID:PID, y como los candidatos se agrupan por VID:PID, solo se ve uno.

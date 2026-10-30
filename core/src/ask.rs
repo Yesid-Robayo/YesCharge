@@ -623,8 +623,9 @@ fn charging_on_cable() -> RawReading {
 }
 
 /// Pregunta la batería a un dispositivo del catálogo. Si se preguntó hace menos de `every` (nunca
-/// menos de `MIN_GAP`), no envía nada y devuelve `Presence::Stale`.
-pub fn read(id: &str, every: Duration) -> RawReading {
+/// menos de `MIN_GAP`), no envía nada y devuelve `Presence::Stale`. Con `None` tampoco envía nada:
+/// solo mira lo que se distingue por los dispositivos que ve Windows.
+pub fn read(id: &str, every: Option<Duration>) -> RawReading {
     let Some(q) = find(id) else {
         return RawReading::absent(Presence::Error, "petición desconocida");
     };
@@ -633,6 +634,14 @@ pub fn read(id: &str, every: Duration) -> RawReading {
     if on_cable && !q.state_on_cable {
         return charging_on_cable();
     }
+    let Some(every) = every else {
+        let linked = q.targets.iter().any(|t| find_interface(t, &all).is_some());
+        return if !linked && is_connected(q.receiver_alone, &all) {
+            RawReading { heard_only: true, ..RawReading::absent(Presence::Off, "apagado") }
+        } else {
+            RawReading::absent(Presence::Stale, "sin preguntar")
+        };
+    };
     if asked_within(q, every.max(MIN_GAP)) {
         return RawReading::absent(Presence::Stale, "preguntado hace poco");
     }

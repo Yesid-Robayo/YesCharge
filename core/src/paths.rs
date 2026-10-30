@@ -1,7 +1,16 @@
-//! Rutas de datos: todo vive en `%APPDATA%\YesCharge` (o en `YESCHARGE_DATA_DIR` si se define,
-//! útil para pruebas o para una instalación portable).
+//! Rutas de datos: todo vive en `%APPDATA%\YesCharge`, salvo que exista una carpeta `YesChargeData`
+//! junto al exe (modo portable) o se defina `YESCHARGE_DATA_DIR` (útil para pruebas).
 
 use std::path::PathBuf;
+
+/// Dónde estarían los datos en modo portable.
+pub fn portable_dir() -> Option<PathBuf> {
+    Some(std::env::current_exe().ok()?.parent()?.join("YesChargeData"))
+}
+
+pub fn is_portable() -> bool {
+    portable_dir().is_some_and(|d| d == data_dir())
+}
 
 pub fn data_dir() -> PathBuf {
     // las pruebas automáticas nunca deben tocar los datos reales del usuario
@@ -10,7 +19,9 @@ pub fn data_dir() -> PathBuf {
     #[cfg(not(test))]
     let dir = match std::env::var_os("YESCHARGE_DATA_DIR") {
         Some(d) => PathBuf::from(d),
-        None => std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir).join("YesCharge"),
+        None => portable_dir().filter(|d| d.is_dir()).unwrap_or_else(|| {
+            std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir).join("YesCharge")
+        }),
     };
     let _ = std::fs::create_dir_all(&dir);
     dir

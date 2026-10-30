@@ -949,7 +949,7 @@ fn start_asking(cand: Candidate, query: &'static Query) -> Stage {
     std::thread::spawn(move || {
         // si se le acaba de preguntar, espera su turno en vez de darlo por fallido
         std::thread::sleep(std::time::Duration::from_secs(ask::wait_secs(query)));
-        let _ = tx.send(ask::read(query.id, ask::MIN_GAP));
+        let _ = tx.send(ask::read(query.id, Some(ask::MIN_GAP)));
     });
     Stage::Asking { cand, query, rx }
 }
@@ -961,7 +961,7 @@ fn ask_later(query: &'static Query, settle: u64, cancelled: Arc<AtomicBool>) -> 
         std::thread::sleep(Duration::from_secs(settle));
         std::thread::sleep(Duration::from_secs(ask::wait_secs(query)));
         if !cancelled.load(Ordering::Relaxed) {
-            let _ = tx.send(ask::read(query.id, ask::MIN_GAP));
+            let _ = tx.send(ask::read(query.id, Some(ask::MIN_GAP)));
         }
     });
     rx

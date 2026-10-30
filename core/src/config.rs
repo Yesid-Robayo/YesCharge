@@ -142,6 +142,8 @@ pub struct Config {
     pub api_enabled: bool,
     pub api_port: u16,
     pub language: Language,
+    /// La lista pone primero lo que está encendido. Sin esto, se respeta el orden guardado.
+    pub auto_sort: bool,
 }
 
 impl Default for Config {
@@ -157,6 +159,7 @@ impl Default for Config {
             api_enabled: false,
             api_port: 8765,
             language: Language::Spanish,
+            auto_sort: true,
         }
     }
 }
