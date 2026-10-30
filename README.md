@@ -16,9 +16,12 @@ your devices.**
 </div>
 
 > [!WARNING]
+> **Personal project: use it at your own risk.** YesCharge was made for its author's own use and is shared as is, with no
+> warranty. It may not work with your device, and any problem that comes from using it is your responsibility.
+>
 > **Beta.** The app, the tray and the read-only engine are working, but very few devices have been tried yet (see
-> [Testing status](#-testing-status)). **It may not be able to read your device.** If it can't, open an *issue* with the
-> report the app saves for you: that is how support for new models grows.
+> [Testing status](#-testing-status)). If yours can't be read, you can open an *issue* with the report the app saves for
+> you.
 
 You pick your device from a list and YesCharge tests it, looking for a **safe** way to read its battery. If it finds
 one, it watches it from the tray, warns you when it's low and when it has finished charging, and learns how long the
@@ -224,9 +227,10 @@ opens a screen with sample data.
 
 ## 📄 License and contributions
 
-- YesCharge is licensed under the **[MIT License](LICENSE)**. It is provided **as is, without any warranty**.
-- It's a personal project, shared in case it's useful to someone else: there's no support commitment, and *issues* get an
-  answer when there's time.
+- YesCharge is licensed under the **[MIT License](LICENSE)**. It is provided **as is, without any warranty**, and you use
+  it **at your own risk**.
+- It's a personal project, made for its author's own use and shared in case it's useful to someone else: there's no
+  support commitment, and *issues* get an answer when there's time.
 - **Pull requests are not accepted** (they are closed automatically). Bugs, ideas and support requests for new devices
   go in an *issue*; see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Security problems are reported privately: [SECURITY.md](SECURITY.md).
