@@ -19,8 +19,8 @@ your devices.**
 </div>
 
 > [!WARNING]
-> **Personal project, no warranty.** I made YesCharge for my own use and I'm sharing it in case it's useful to someone else. It's offered
-> as is, and it may not work with your device.
+> **Free and open source, no warranty.** YesCharge is made by one person and offered as is: it may not work with your device. If
+> something fails, open an [issue](https://github.com/Yesid-Robayo/YesCharge/issues) and we'll look into it.
 >
 > **Beta.** The app, the tray and the read-only engine are working, but very few devices have been tried yet (see
 > [Testing status](#-testing-status)). If yours can't be read, you can open an *issue* with the report the app saves for
@@ -289,8 +289,7 @@ YesCharge is free and made by one person. If you like it and want to support it,
 ## 📄 License and contributions
 
 - YesCharge is licensed under the **[MIT License](LICENSE)**. It is provided **as is, without any warranty**.
-- It's a personal project, made for its author's own use and shared in case it's useful to someone else: there's no
-  support commitment, and *issues* get an answer when there's time.
+- It's made by one person: there's no support commitment, and *issues* get an answer when there's time.
 - **Pull requests are not accepted** (they are closed automatically). Bugs, ideas and support requests for new devices
   go in an *issue*; see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Security problems are reported privately: [SECURITY.md](SECURITY.md).
