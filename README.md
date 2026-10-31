@@ -20,11 +20,17 @@ your devices.**
 
 > [!WARNING]
 > **Free and open source, no warranty.** YesCharge is made by one person and offered as is: it may not work with your device. If
-> something fails, open an [issue](https://github.com/Yesid-Robayo/YesCharge/issues) and we'll look into it.
+> you have any problem, open an [issue](https://github.com/Yesid-Robayo/YesCharge/issues) and I'll try to help.
 >
 > **Beta.** The app, the tray and the read-only engine are working, but very few devices have been tried yet (see
 > [Testing status](#-testing-status)). If yours can't be read, you can open an *issue* with the report the app saves for
 > you.
+
+> [!CAUTION]
+> **Letting YesCharge ask a device is at your own risk.** By default it only reads. If you turn on asking for a device, YesCharge
+> sends it a request, and nothing sent to a device is 100 % safe: a different firmware could behave differently, and the device
+> could even stop working. You turn it on under your own responsibility, and the author isn't liable for any damage. If you're
+> not sure, leave it off.
 
 You pick your device from a list and YesCharge tests it, looking for a **safe** way to read its battery. If it finds
 one, it watches it from the tray, warns you when it's low and when it has finished charging, and learns how long the

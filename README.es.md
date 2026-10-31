@@ -20,11 +20,17 @@ dispositivos.**
 
 > [!WARNING]
 > **Gratis y de código abierto, sin garantía.** YesCharge lo hace una sola persona y se ofrece tal cual: puede que no funcione con tu
-> dispositivo. Si algo falla, abre un [*issue*](https://github.com/Yesid-Robayo/YesCharge/issues) y lo miramos.
+> dispositivo. Si tienes algún problema, abre un [*issue*](https://github.com/Yesid-Robayo/YesCharge/issues) y trato de ayudarte.
 >
 > **Beta.** La app, la bandeja y el motor de solo lectura funcionan, pero todavía se han probado muy pocos dispositivos
 > (mira el [estado de las pruebas](#-estado-de-las-pruebas)). Si no consigue leer el tuyo, puedes abrir un *issue* con el
 > informe que la app te guarda.
+
+> [!CAUTION]
+> **Dejar que YesCharge le pregunte a un dispositivo es bajo tu propio riesgo.** Por defecto solo lee. Si activas preguntar en un
+> dispositivo, YesCharge le envía una petición, y ningún envío a un dispositivo es 100 % seguro: con otro firmware podría comportarse
+> distinto, e incluso dejar de funcionar. Lo activas bajo tu responsabilidad, y el autor no responde por ningún daño. Si no estás
+> seguro, déjalo apagado.
 
 Eliges tu dispositivo de una lista y YesCharge lo prueba buscando una forma **segura** de leer su batería. Si la
 encuentra, lo vigila desde la bandeja, te avisa cuando está bajo y cuando terminó de cargar, y aprende cuánto dura la
