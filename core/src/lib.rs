@@ -24,6 +24,7 @@ pub mod status;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const REPO_URL: &str = "https://github.com/Yesid-Robayo/YesCharge";
+pub const KOFI_URL: &str = "https://ko-fi.com/yesidrobayo";
 
 /// Segundos desde la época Unix.
 pub fn now_secs() -> f64 {

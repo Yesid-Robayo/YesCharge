@@ -169,6 +169,9 @@ impl Settings {
                     if ui.link("GitHub").clicked() {
                         ipc::open_external(yescharge_core::REPO_URL);
                     }
+                    if ui.link(tr("Apoyar en Ko-fi", "Support on Ko-fi")).clicked() {
+                        ipc::open_external(yescharge_core::KOFI_URL);
+                    }
                 });
             });
 

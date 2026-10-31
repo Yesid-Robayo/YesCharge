@@ -10,6 +10,7 @@ your devices.**
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-2f5fb3)
 ![Size](https://img.shields.io/badge/size-~5%20MB%2C%20no%20runtime-12a8c9)
 ![Languages](https://img.shields.io/badge/languages-english%20%7C%20español-7ddc8f)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20the%20project-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/yesidrobayo)
 
 **English** · [Español](README.es.md) · [Changelog](CHANGELOG.md)
 
@@ -18,8 +19,8 @@ your devices.**
 </div>
 
 > [!WARNING]
-> **Personal project: use it at your own risk.** YesCharge was made for its author's own use and is shared as is, with no
-> warranty. It may not work with your device, and any problem that comes from using it is your responsibility.
+> **Personal project, no warranty.** I made YesCharge for my own use and I'm sharing it in case it's useful to someone else. It's offered
+> as is, and it may not work with your device.
 >
 > **Beta.** The app, the tray and the read-only engine are working, but very few devices have been tried yet (see
 > [Testing status](#-testing-status)). If yours can't be read, you can open an *issue* with the report the app saves for
@@ -45,6 +46,7 @@ YesCharge ask. That option is off, it's per device, and you have to accept a ris
 - [Technology](#-technology)
 - [Development](#-development)
 - [Credits](#-credits)
+- [Support the project](#-support-the-project)
 - [License and contributions](#-license-and-contributions)
 
 ---
@@ -277,10 +279,16 @@ opens a screen with sample data.
 
 ---
 
+## ☕ Support the project
+
+YesCharge is free and made by one person. If you like it and want to support it, you can buy me a coffee on
+**[Ko-fi](https://ko-fi.com/yesidrobayo)**. It's not required: telling whether it works with your device helps a lot too.
+
+---
+
 ## 📄 License and contributions
 
-- YesCharge is licensed under the **[MIT License](LICENSE)**. It is provided **as is, without any warranty**, and you use
-  it **at your own risk**.
+- YesCharge is licensed under the **[MIT License](LICENSE)**. It is provided **as is, without any warranty**.
 - It's a personal project, made for its author's own use and shared in case it's useful to someone else: there's no
   support commitment, and *issues* get an answer when there's time.
 - **Pull requests are not accepted** (they are closed automatically). Bugs, ideas and support requests for new devices

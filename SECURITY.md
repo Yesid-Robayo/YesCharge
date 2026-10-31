@@ -40,7 +40,7 @@ Only the latest version published in *Releases* receives fixes.
 - **No administrator rights, no drivers, no services installed.** Starting with Windows is a value in
   `HKCU\...\Run` that you can turn off.
 - **No telemetry, no automatic updates, no accounts.** It never connects to the internet. The links in the window
-  (GitHub, opening an *issue*) only open your browser when you click them.
+  (GitHub, Ko-fi, opening an *issue*) only open your browser when you click them.
 - **The local API is off by default.** When on, it listens on `127.0.0.1` only, accepts only `GET`, has no CORS
   headers (a web page can't read its answers), checks the `Host` header (blocks *DNS rebinding*) and limits request size,
   time and simultaneous connections.
@@ -98,7 +98,7 @@ Solo la última versión publicada en *Releases* recibe arreglos.
 - **Sin permisos de administrador, sin drivers, sin servicios instalados.** Iniciar con Windows es un valor en
   `HKCU\...\Run` que puedes desactivar.
 - **Sin telemetría, sin actualizaciones automáticas, sin cuentas.** Nunca se conecta a internet. Los enlaces de la
-  ventana (GitHub, abrir un *issue*) solo abren tu navegador cuando haces clic.
+  ventana (GitHub, Ko-fi, abrir un *issue*) solo abren tu navegador cuando haces clic.
 - **La API local está desactivada por defecto.** Si la activas, escucha solo en `127.0.0.1`, acepta solo `GET`, no
   tiene cabeceras CORS (una página web no puede leer sus respuestas), comprueba la cabecera `Host` (bloquea el *DNS
   rebinding*) y limita el tamaño, el tiempo y las conexiones simultáneas.

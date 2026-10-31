@@ -10,6 +10,7 @@ dispositivos.**
 ![Plataforma](https://img.shields.io/badge/plataforma-Windows%2010%20%7C%2011-2f5fb3)
 ![Tamaño](https://img.shields.io/badge/tamaño-~5%20MB%2C%20sin%20runtime-12a8c9)
 ![Idiomas](https://img.shields.io/badge/idiomas-english%20%7C%20español-7ddc8f)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-apoya%20el%20proyecto-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/yesidrobayo)
 
 [English](README.md) · **Español** · [Cambios por versión](CHANGELOG.es.md)
 
@@ -18,9 +19,8 @@ dispositivos.**
 </div>
 
 > [!WARNING]
-> **Proyecto personal: úsalo bajo tu propio riesgo.** YesCharge se hizo para uso propio de su autor y se comparte tal
-> cual, sin garantía. Puede que no funcione con tu dispositivo, y cualquier problema derivado de usarlo es responsabilidad
-> tuya.
+> **Proyecto personal, sin garantía.** Hice YesCharge para mi propio uso y lo comparto por si a alguien más le sirve. Se ofrece tal cual, y
+> puede que no funcione con tu dispositivo.
 >
 > **Beta.** La app, la bandeja y el motor de solo lectura funcionan, pero todavía se han probado muy pocos dispositivos
 > (mira el [estado de las pruebas](#-estado-de-las-pruebas)). Si no consigue leer el tuyo, puedes abrir un *issue* con el
@@ -46,6 +46,7 @@ YesCharge les pregunte. Esa opción viene apagada, es por dispositivo y hay que 
 - [Tecnología](#-tecnología)
 - [Desarrollo](#-desarrollo)
 - [Créditos](#-créditos)
+- [Apoya el proyecto](#-apoya-el-proyecto)
 - [Licencia y contribuciones](#-licencia-y-contribuciones)
 
 ---
@@ -281,10 +282,16 @@ abre una pantalla con datos de ejemplo.
 
 ---
 
+## ☕ Apoya el proyecto
+
+YesCharge es gratis y lo hace una sola persona. Si te gusta y quieres apoyarlo, puedes invitarme a un café en
+**[Ko-fi](https://ko-fi.com/yesidrobayo)**. No es obligatorio: contar si funciona con tu dispositivo también ayuda mucho.
+
+---
+
 ## 📄 Licencia y contribuciones
 
-- YesCharge tiene licencia **[MIT](LICENSE)**. Se ofrece **tal cual, sin ninguna garantía**, y se usa **bajo tu propio
-  riesgo**.
+- YesCharge tiene licencia **[MIT](LICENSE)**. Se ofrece **tal cual, sin ninguna garantía**.
 - Es un proyecto personal, hecho para uso propio de su autor y compartido por si le sirve a alguien más: no hay
   compromiso de soporte, y los *issues* se responden cuando hay tiempo.
 - **No se aceptan *pull requests*** (se cierran automáticamente). Los errores, las ideas y las peticiones de soporte
