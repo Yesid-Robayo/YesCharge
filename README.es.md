@@ -13,7 +13,7 @@ dispositivos.**
 
 [English](README.md) · **Español** · [Cambios por versión](CHANGELOG.es.md)
 
-<img src="docs/images/home.png" alt="Ventana de YesCharge con la batería de un ratón, un teclado, unos auriculares y un mando" width="380">
+<img src="docs/images/home-es.png" alt="Ventana de YesCharge con la batería de un ratón, un teclado, unos auriculares y un mando" width="380">
 
 </div>
 
